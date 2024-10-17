@@ -1,0 +1,22 @@
+{
+    "name": "esp-audio-libs",
+    "version": "0.1.0",
+    "description": "Libraries for playing audio files on ESP32 devices",
+    "keywords": "audio",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/esphome/esp-audio-libs.git"
+    },
+    "authors":
+    [
+      {
+        "name": "ESPHome Team",
+        "maintainer": true
+      }
+    ],
+    "homepage": "https://github.com/esphome/esp-audio-libs.git",
+    "dependencies": [],
+    "frameworks": "*",
+    "platforms": "espressif32"
+  }
