@@ -9,6 +9,7 @@
 #ifndef _FLAC_DECODER_H
 #define _FLAC_DECODER_H
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
