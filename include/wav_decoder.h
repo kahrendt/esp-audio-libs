@@ -31,8 +31,6 @@
 
 namespace wav_decoder {
 
-const std::size_t min_buffer_size = 24;
-
 enum WAVDecoderState {
 
   WAV_DECODER_BEFORE_RIFF = 0,
@@ -47,16 +45,18 @@ enum WAVDecoderState {
 enum WAVDecoderResult {
   WAV_DECODER_SUCCESS_NEXT = 0,
   WAV_DECODER_SUCCESS_IN_DATA = 1,
-  WAV_DECODER_ERROR_NO_RIFF = 2,
-  WAV_DECODER_ERROR_NO_WAVE = 3,
+  WAV_DECODER_WARNING_INCOMPLETE_DATA = 2,
+  WAV_DECODER_ERROR_NO_RIFF = 3,
+  WAV_DECODER_ERROR_NO_WAVE = 4,
+  WAV_DECODER_ERROR_FAILED = 5,
 };
 
 class WAVDecoder {
  public:
-  WAVDecoder(uint8_t **buffer) : buffer_(buffer) {};
   ~WAVDecoder() {};
 
   WAVDecoderState state() { return this->state_; }
+  std::size_t bytes_processed() { return this->bytes_processed_; }
   std::size_t bytes_to_skip() { return this->bytes_to_skip_; }
   std::size_t bytes_needed() { return this->bytes_needed_; }
   std::string chunk_name() { return this->chunk_name_; }
@@ -65,27 +65,21 @@ class WAVDecoder {
   uint16_t num_channels() { return this->num_channels_; }
   uint16_t bits_per_sample() { return this->bits_per_sample_; }
 
+  WAVDecoderResult decode_header(uint8_t *buffer, size_t bytes_available);
+
   // Advance decoding:
   // 1. Check bytes_to_skip() first, and skip that many bytes.
   // 2. Read exactly bytes_needed() into the start of the buffer.
   // 3. Run next() and loop to 1 until the result is
   // WAV_DECODER_SUCCESS_IN_DATA.
   // 4. Use chunk_bytes_left() to read the data samples.
-  WAVDecoderResult next();
+  WAVDecoderResult next(uint8_t *buffer);
 
-  void reset() {
-    this->state_ = WAV_DECODER_BEFORE_RIFF;
-    this->bytes_to_skip_ = 0;
-    this->chunk_name_ = "";
-    this->chunk_bytes_left_ = 0;
-
-    this->sample_rate_ = 0;
-    this->num_channels_ = 0;
-    this->bits_per_sample_ = 0;
-  }
+  void reset();
 
  protected:
-  uint8_t **buffer_;
+  size_t bytes_processed_;
+
   WAVDecoderState state_ = WAV_DECODER_BEFORE_RIFF;
   std::size_t bytes_needed_ = 8;  // chunk name + size
   std::size_t bytes_to_skip_ = 0;
