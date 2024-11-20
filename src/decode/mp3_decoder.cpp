@@ -8535,8 +8535,10 @@ int MP3FindSyncWord(unsigned char *buf, int nBytes) {
   /* find byte-aligned syncword - need 12 (MPEG 1,2) or 11 (MPEG 2.5) matching
    * bits */
   for (i = 0; i < nBytes - 1; i++) {
-    if ((buf[i + 0] & SYNCWORDH) == SYNCWORDH && (buf[i + 1] & SYNCWORDL) == SYNCWORDL)
+    if ((buf[i + 0] & SYNCWORDH) == SYNCWORDH && (buf[i + 1] & SYNCWORDL) == SYNCWORDL) {
+      printf("finding sync word buf[i+0]=%d; buf[i+1]=%d\n", buf[i+0], buf[i+1]);
       return i;
+    }
   }
 
   return -1;
