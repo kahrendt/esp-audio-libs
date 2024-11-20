@@ -8530,54 +8530,64 @@ void MP3FreeDecoder(HMP3Decoder hMP3Decoder) {
  *              -1 if sync not found after searching nBytes
  **************************************************************************************/
 int MP3FindSyncWord(unsigned char *buf, int nBytes) {
-  const uint8_t mp3FHsize = 4;  // frame header size
-  unsigned char firstFH[4];
+  int i;
 
-  // ————————————————————————————————————————————————————————————————————————————————————————————————————————
-  auto findSync = [&](unsigned char *buf, uint16_t offset, uint16_t len) {  // lambda, inner function
-    for (int i = 0; i < nBytes - 1; i++) {
-      if ((buf[i + offset] & SYNCWORDH) == SYNCWORDH && (buf[i + offset + 1] & SYNCWORDL) == SYNCWORDL) {
-        return i;
-      }
-    }
-    return -1;
-  };
-  // ————————————————————————————————————————————————————————————————————————————————————————————————————————
-  /* find byte-aligned syncword - need 12 (MPEG 1,2) or 11 (MPEG 2.5) matching bits */
-  int pos = findSync(buf, 0, nBytes);
-  if (pos == -1)
-    return pos;  // syncword not found
-  nBytes -= pos;
-
-  while (nBytes > 0) {
-    firstFH[0] = buf[pos + 0];
-    firstFH[1] = buf[pos + 1];
-    firstFH[2] = buf[pos + 2];
-    firstFH[3] = buf[pos + 2];
-
-    if ((firstFH[2] & 0b11110000) == 0b11110000) {  // wrong bitrate index
-      // log_d("wrong bitrate index");
-      pos += mp3FHsize;
-      nBytes -= mp3FHsize;
-      int i = findSync(buf, pos, nBytes);
-      pos += i;
-      nBytes -= i;
-      continue;
-    }
-
-    if ((firstFH[2] & 0b00001100) == 0b00001100) {  // wrong sampling rate frequency index
-      // log_d("wrong sampling rate");
-      pos += mp3FHsize;
-      nBytes -= mp3FHsize;
-      int i = findSync(buf, pos, nBytes);
-      pos += i;
-      nBytes -= i;
-      continue;
-    }
-    break;
+  /* find byte-aligned syncword - need 12 (MPEG 1,2) or 11 (MPEG 2.5) matching
+   * bits */
+  for (i = 0; i < nBytes - 1; i++) {
+    if ((buf[i + 0] & SYNCWORDH) == SYNCWORDH && (buf[i + 1] & SYNCWORDL) == SYNCWORDL)
+      return i;
   }
 
-  return pos;
+  return -1;
+  // const uint8_t mp3FHsize = 4;  // frame header size
+  // unsigned char firstFH[4];
+
+  // // ————————————————————————————————————————————————————————————————————————————————————————————————————————
+  // auto findSync = [&](unsigned char *buf, uint16_t offset, uint16_t len) {  // lambda, inner function
+  //   for (int i = 0; i < nBytes - 1; i++) {
+  //     if ((buf[i + offset] & SYNCWORDH) == SYNCWORDH && (buf[i + offset + 1] & SYNCWORDL) == SYNCWORDL) {
+  //       return i;
+  //     }
+  //   }
+  //   return -1;
+  // };
+  // // ————————————————————————————————————————————————————————————————————————————————————————————————————————
+  // /* find byte-aligned syncword - need 12 (MPEG 1,2) or 11 (MPEG 2.5) matching bits */
+  // int pos = findSync(buf, 0, nBytes);
+  // if (pos == -1)
+  //   return pos;  // syncword not found
+  // nBytes -= pos;
+
+  // while (nBytes > 0) {
+  //   firstFH[0] = buf[pos + 0];
+  //   firstFH[1] = buf[pos + 1];
+  //   firstFH[2] = buf[pos + 2];
+  //   firstFH[3] = buf[pos + 2];
+
+  //   if ((firstFH[2] & 0b11110000) == 0b11110000) {  // wrong bitrate index
+  //     // log_d("wrong bitrate index");
+  //     pos += mp3FHsize;
+  //     nBytes -= mp3FHsize;
+  //     int i = findSync(buf, pos, nBytes);
+  //     pos += i;
+  //     nBytes -= i;
+  //     continue;
+  //   }
+
+  //   if ((firstFH[2] & 0b00001100) == 0b00001100) {  // wrong sampling rate frequency index
+  //     // log_d("wrong sampling rate");
+  //     pos += mp3FHsize;
+  //     nBytes -= mp3FHsize;
+  //     int i = findSync(buf, pos, nBytes);
+  //     pos += i;
+  //     nBytes -= i;
+  //     continue;
+  //   }
+  //   break;
+  // }
+
+  // return pos;
 }
 
 /**************************************************************************************
