@@ -26,14 +26,14 @@ typedef enum { MPEG1 = 0, MPEG2 = 1, MPEG25 = 2 } MPEGVersion;
 #define NGRANS_MPEG2 1
 
 /* 11-bit syncword if MPEG 2.5 extensions are enabled */
-/*
 #define	SYNCWORDH		0xff
 #define	SYNCWORDL		0xe0
-*/
 
 /* 12-bit syncword if MPEG 1,2 only are supported */
+/*
 #define SYNCWORDH 0xff
 #define SYNCWORDL 0xf0
+*/
 
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
