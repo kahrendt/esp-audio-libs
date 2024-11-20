@@ -8305,7 +8305,7 @@ int UnpackFrameHeader(MP3DecInfo *mp3DecInfo, unsigned char *buf) {
   /* validate pointers and sync word */
   if (!mp3DecInfo || !mp3DecInfo->FrameHeaderPS || (buf[0] & SYNCWORDH) != SYNCWORDH ||
       (buf[1] & SYNCWORDL) != SYNCWORDL) {
-    printf("buf[0]=%04X; buf[1]=%04X\n", buf[0], buf[1]);
+    printf("buf[0]=%d; buf[1]=%d\n", buf[0], buf[1]);
     return -1;
   }
 
