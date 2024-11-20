@@ -8535,7 +8535,7 @@ int MP3FindSyncWord(unsigned char *buf, int nBytes) {
     //————————————————————————————————————————————————————————————————————————————————————————————————————————
     auto findSync = [&](unsigned char* buf, uint16_t offset, uint16_t len) { // lambda, inner function
         for (int i = 0; i < nBytes - 1; i++) {
-            if ((buf[i + offset] & m_SYNCWORDH) == m_SYNCWORDH && (buf[i + offset + 1] & m_SYNCWORDL) == m_SYNCWORDL){
+            if ((buf[i + offset] & SYNCWORDH) == SYNCWORDH && (buf[i + offset + 1] & SYNCWORDL) == SYNCWORDL){
                 return i;
             }
         }
@@ -8554,7 +8554,7 @@ int MP3FindSyncWord(unsigned char *buf, int nBytes) {
         firstFH[3] = buf[pos + 2];
 
         if((firstFH[2] & 0b11110000) == 0b11110000){ // wrong bitrate index
-            log_d("wrong bitrate index");
+            // log_d("wrong bitrate index");
             pos += mp3FHsize;
             nBytes -= mp3FHsize;
             int i = findSync(buf, pos, nBytes);
@@ -8564,7 +8564,7 @@ int MP3FindSyncWord(unsigned char *buf, int nBytes) {
         }
 
         if((firstFH[2] & 0b00001100) == 0b00001100){ // wrong sampling rate frequency index
-            log_d("wrong sampling rate");
+            // log_d("wrong sampling rate");
             pos += mp3FHsize;
             nBytes -= mp3FHsize;
             int i = findSync(buf, pos, nBytes);
