@@ -303,7 +303,7 @@ FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_lengt
   for (uint32_t i = 0; i < this->curr_frame_block_size_; i++) {
     for (uint32_t j = 0; j < this->num_channels_; j++) {
       output_buffer[output_index] =
-            ((this->block_samples_[(j * block_size) + i]) + addend) >> shift;
+            ((this->block_samples_[(j * this->curr_frame_block_size_) + i]) + addend) >> shift;
       output_index++;
     }
   }
