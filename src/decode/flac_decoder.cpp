@@ -172,26 +172,6 @@ FLACDecoderResult FLACDecoder::decode_frame_header_() {
   raw_header[raw_header_len++] = new_byte;
   this->curr_frame_channel_assign_ = raw_header[3] >> 4;
 
-  // 9.1.4 Bit depth bits
-  uint8_t bits_per_sample_code = (raw_header[3] & 0x0e) >> 1;
-  switch (bits_per_sample_code) {
-    case 0:
-      // take bit depth from streaminfo header
-      break;
-    case 1:  //  8 bit
-    case 2:  // 12 bit
-      // not supported in this version
-      return FLAC_DECODER_ERROR_BAD_HEADER;
-    case 4:  // 16 bit
-      break;
-    case 5:  // 20bit
-    case 6:  // 24bit
-    case 7:  // 32bit
-    default:
-      // not supported in this version
-      return FLAC_DECODER_ERROR_BAD_HEADER;
-  }
-
   // reserved bit needs to be zero:
   // ignore raw_header[3] & 0x01 != 0
   // seems not to be respected by all encoder versions
