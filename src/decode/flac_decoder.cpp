@@ -221,7 +221,8 @@ FLACDecoderResult FLACDecoder::decode_frame_header_() {
   return FLAC_DECODER_SUCCESS;
 }
 
-FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_length, int16_t *output_buffer, uint32_t *num_samples) {
+FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_length, int16_t *output_buffer,
+                                            uint32_t *num_samples) {
   this->buffer_ = buffer;
   this->buffer_index_ = 0;
   this->bytes_left_ = buffer_length;
@@ -283,7 +284,7 @@ FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_lengt
   for (uint32_t i = 0; i < this->curr_frame_block_size_; i++) {
     for (uint32_t j = 0; j < this->num_channels_; j++) {
       output_buffer[output_index] =
-            ((this->block_samples_[(j * this->curr_frame_block_size_) + i]) + addend) >> shift;
+          static_cast<int16_t>(((this->block_samples_[(j * this->curr_frame_block_size_) + i]) + addend) >> shift);
       output_index++;
     }
   }
