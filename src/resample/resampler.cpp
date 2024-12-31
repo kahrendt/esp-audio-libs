@@ -33,56 +33,59 @@ bool Resampler::initialize(ResamplerConfiguration &config) {
     return false;
   }
 
-  int flags = 0;
+  if (config.source_sample_rate != config.target_sample_rate) {
+    this->requires_resampling_ = true;
+    int flags = 0;
 
-  if (config.subsample_interpolate) {
-    flags |= SUBSAMPLE_INTERPOLATE;
-  }
-
-  this->sample_ratio_ = config.target_sample_rate / config.source_sample_rate;
-
-  if (this->sample_ratio_ < 1.0) {
-    this->lowpass_ratio_ -= (10.24 / this->number_of_taps_);
-
-    if (this->lowpass_ratio_ < 0.84) {
-      this->lowpass_ratio_ = 0.84;
+    if (config.subsample_interpolate) {
+      flags |= SUBSAMPLE_INTERPOLATE;
     }
 
-    if (this->lowpass_ratio_ < this->sample_ratio_) {
-      // avoid discontinuities near unity sample ratios
-      this->lowpass_ratio_ = this->sample_ratio_;
+    this->sample_ratio_ = config.target_sample_rate / config.source_sample_rate;
+
+    if (this->sample_ratio_ < 1.0) {
+      this->lowpass_ratio_ -= (10.24 / this->number_of_taps_);
+
+      if (this->lowpass_ratio_ < 0.84) {
+        this->lowpass_ratio_ = 0.84;
+      }
+
+      if (this->lowpass_ratio_ < this->sample_ratio_) {
+        // avoid discontinuities near unity sample ratios
+        this->lowpass_ratio_ = this->sample_ratio_;
+      }
     }
-  }
-  if (this->lowpass_ratio_ * this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter) {
-    float cutoff = this->lowpass_ratio_ * this->sample_ratio_ / 2.0;
-    biquad_lowpass(&this->lowpass_coeff_, cutoff);
-    this->pre_filter_ = true;
-  }
-
-  if (this->lowpass_ratio_ / this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter && !this->pre_filter_) {
-    float cutoff = this->lowpass_ratio_ / this->sample_ratio_ / 2.0;
-    biquad_lowpass(&this->lowpass_coeff_, cutoff);
-    this->post_filter_ = true;
-  }
-
-  if (this->pre_filter_ || this->post_filter_) {
-    for (int i = 0; i < this->channels_; ++i) {
-      biquad_init(&this->lowpass_[i][0], &this->lowpass_coeff_, 1.0);
-      biquad_init(&this->lowpass_[i][1], &this->lowpass_coeff_, 1.0);
+    if (this->lowpass_ratio_ * this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter) {
+      float cutoff = this->lowpass_ratio_ * this->sample_ratio_ / 2.0;
+      biquad_lowpass(&this->lowpass_coeff_, cutoff);
+      this->pre_filter_ = true;
     }
-  }
 
-  if (this->sample_ratio_ < 1.0) {
-    this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_,
-                                    this->sample_ratio_ * this->lowpass_ratio_, flags | INCLUDE_LOWPASS);
-  } else if (this->lowpass_ratio_ < 1.0) {
-    this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_,
-                                    this->lowpass_ratio_, flags | INCLUDE_LOWPASS);
-  } else {
-    this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_, 1.0, flags);
-  }
+    if (this->lowpass_ratio_ / this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter && !this->pre_filter_) {
+      float cutoff = this->lowpass_ratio_ / this->sample_ratio_ / 2.0;
+      biquad_lowpass(&this->lowpass_coeff_, cutoff);
+      this->post_filter_ = true;
+    }
 
-  resampleAdvancePosition(this->resampler_, this->number_of_taps_ / 2.0);
+    if (this->pre_filter_ || this->post_filter_) {
+      for (int i = 0; i < this->channels_; ++i) {
+        biquad_init(&this->lowpass_[i][0], &this->lowpass_coeff_, 1.0);
+        biquad_init(&this->lowpass_[i][1], &this->lowpass_coeff_, 1.0);
+      }
+    }
+
+    if (this->sample_ratio_ < 1.0) {
+      this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_,
+                                      this->sample_ratio_ * this->lowpass_ratio_, flags | INCLUDE_LOWPASS);
+    } else if (this->lowpass_ratio_ < 1.0) {
+      this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_,
+                                      this->lowpass_ratio_, flags | INCLUDE_LOWPASS);
+    } else {
+      this->resampler_ = resampleInit(this->channels_, this->number_of_taps_, this->number_of_filters_, 1.0, flags);
+    }
+
+    resampleAdvancePosition(this->resampler_, this->number_of_taps_ / 2.0);
+  }
 
   return true;
 }
@@ -96,31 +99,37 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process * this->channels_, this->input_bits_,
                      gain_db);
 
-  if (this->pre_filter_) {
-    for (int i = 0; i < this->channels_; ++i) {
-      biquad_apply_buffer(&this->lowpass_[i][0], this->float_input_buffer_ + i, frames_to_process, this->channels_);
-      biquad_apply_buffer(&this->lowpass_[i][1], this->float_input_buffer_ + i, frames_to_process, this->channels_);
+  size_t frames_used = frames_to_process;
+  size_t frames_generated = frames_to_process;
+  size_t predicted_frames_used = frames_to_process;
+
+  if (this->requires_resampling_) {
+    if (this->pre_filter_) {
+      for (int i = 0; i < this->channels_; ++i) {
+        biquad_apply_buffer(&this->lowpass_[i][0], this->float_input_buffer_ + i, frames_to_process, this->channels_);
+        biquad_apply_buffer(&this->lowpass_[i][1], this->float_input_buffer_ + i, frames_to_process, this->channels_);
+      }
+    }
+
+    ResampleResult res =
+        resampleProcessInterleaved(this->resampler_, this->float_input_buffer_, frames_to_process,
+                                   this->float_output_buffer_, output_frames_free, this->sample_ratio_);
+
+    frames_used = res.input_used;
+    frames_generated = res.output_generated;
+
+    if (this->post_filter_) {
+      for (int i = 0; i < this->channels_; ++i) {
+        biquad_apply_buffer(&this->lowpass_[i][0], this->float_output_buffer_ + i, frames_generated, this->channels_);
+        biquad_apply_buffer(&this->lowpass_[i][1], this->float_output_buffer_ + i, frames_generated, this->channels_);
+      }
     }
   }
-
-  ResampleResult res = resampleProcessInterleaved(this->resampler_, this->float_input_buffer_, frames_to_process,
-                                                  this->float_output_buffer_, output_frames_free, this->sample_ratio_);
-
-  size_t frames_generated = res.output_generated;
-
-  if (this->post_filter_) {
-    for (int i = 0; i < this->channels_; ++i) {
-      biquad_apply_buffer(&this->lowpass_[i][0], this->float_output_buffer_ + i, frames_generated, this->channels_);
-      biquad_apply_buffer(&this->lowpass_[i][1], this->float_output_buffer_ + i, frames_generated, this->channels_);
-    }
-  }
-
-  const size_t samples_generated = frames_generated * this->channels_;
 
   uint32_t clipped_samples =
-      float_to_quantized(this->float_output_buffer_, output_buffer, samples_generated, this->output_bits_);
+      float_to_quantized(this->float_output_buffer_, output_buffer, frames_generated*this->channels_, this->output_bits_);
 
-  ResamplerResults results = {.frames_used = res.input_used,
+  ResamplerResults results = {.frames_used = frames_used,
                               .frames_generated = frames_generated,
                               .predicted_frames_used = frames_to_process,
                               .clipped_samples = clipped_samples};

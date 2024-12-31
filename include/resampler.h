@@ -72,6 +72,7 @@ class Resampler {
 
   bool pre_filter_{false};
   bool post_filter_{false};
+  bool requires_resampling_{false};
 
   uint8_t input_bits_;
   uint8_t output_bits_;
