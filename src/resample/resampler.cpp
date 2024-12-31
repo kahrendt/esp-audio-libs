@@ -113,56 +113,56 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   gain = pow(10.0, gain / 20.0);
 
-  if (this->input_bits_ <= 8) {
-    float gain_factor = gain / 128.0;
+  // if (this->input_bits_ <= 8) {
+  //   float gain_factor = gain / 128.0;
 
-    for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
-      this->float_input_buffer_[i] = ((int) input_buffer[i] - 128) * gain_factor;
-    }
-
-  } else if (this->input_bits_ <= 16) {
-    float gain_factor = gain / 32768.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-      int16_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      this->float_input_buffer_[i] = value * gain_factor;
-    }
-  } else if (this->input_bits_ <= 24) {
-    float gain_factor = gain / 8388608.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-      int32_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      value += (int32_t) (signed char) input_buffer[j++] << 16;
-      this->float_input_buffer_[i] = value * gain_factor;
-    }
-  } else if (this->input_bits_ <= 32) {
-    float gain_factor = gain / 2147483647.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-      int32_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      value += (int32_t) (signed char) input_buffer[j++] << 16;
-      value += (int32_t) (signed char) input_buffer[j++] << 24;
-      this->float_input_buffer_[i] = value * gain_factor;
-    }
-  }
-
-  // for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
-  //   float divisor = 1;
-  //   if (this->input_bits_ <= 8) {
-  //     divisor = 128.0;
-  //   } else if (this->input_bits_ <= 16) {
-  //     divisor = 32768.0;
-  //   } else if (this->input_bits_ <= 24) {
-  //     divisor = 8388608.0
+  //   for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
+  //     this->float_input_buffer_[i] = ((int) input_buffer[i] - 128) * gain_factor;
   //   }
-  //   this->float_input_buffer_[i] = static_cast<float>(input[i]) / 32768.0f;
+
+  // } else if (this->input_bits_ <= 16) {
+  //   float gain_factor = gain / 32768.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+  //     int16_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     this->float_input_buffer_[i] = value * gain_factor;
+  //   }
+  // } else if (this->input_bits_ <= 24) {
+  //   float gain_factor = gain / 8388608.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+  //     int32_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
+  //     this->float_input_buffer_[i] = value * gain_factor;
+  //   }
+  // } else if (this->input_bits_ <= 32) {
+  //   float gain_factor = gain / 2147483647.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+  //     int32_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 24;
+  //     this->float_input_buffer_[i] = value * gain_factor;
+  //   }
   // }
+
+  for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
+    //   float divisor = 1;
+    //   if (this->input_bits_ <= 8) {
+    //     divisor = 128.0;
+    //   } else if (this->input_bits_ <= 16) {
+    //     divisor = 32768.0;
+    //   } else if (this->input_bits_ <= 24) {
+    //     divisor = 8388608.0
+    //   }
+    this->float_input_buffer_[i] = static_cast<float>(reinterpret_cast<const int16_t *>(input_buffer)[i]) / 32768.0f;
+  }
 
   if (this->pre_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
