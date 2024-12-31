@@ -166,13 +166,15 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   const size_t samples_generated = frames_generated * this->channels_;
 
-  float scaler = (1 << this->output_bits_) / 2.0;
+  float scaler = (static_cast<uint64_t>(1) << this->output_bits_) / 2.0;
   int32_t offset = (this->output_bits_ <= 8) * 128;
   int32_t high_clip = (1 << (this->output_bits_ - 1)) - 1;
   int32_t low_clip = ~high_clip;
   int left_shift = (32 - this->output_bits_) % 8;
   size_t i, j;
   uint32_t clipped_samples = 0;
+
+  printf("scaler multiple = %.3f\n", scaler);
 
   for (i = j = 0; i < samples_generated; ++i) {
     uint8_t chan = i % this->channels_;
