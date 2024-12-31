@@ -55,9 +55,6 @@ class Resampler {
                          //uint32_t &clipped_samples);
 
  protected:
-  void tpdf_dither_init_(int num_channels);
-  float tpdf_dither_(int channel, int type);
-
   float *float_input_buffer_{nullptr};
   size_t input_buffer_samples_;
 
@@ -81,8 +78,5 @@ class Resampler {
   uint8_t input_bits_;
   uint8_t output_bits_;
   uint8_t channels_;
-
-  uint32_t *tpdf_generators_{nullptr};
-  float *error_{nullptr};
 };
 }  // namespace resampler
