@@ -193,7 +193,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   int32_t offset = (this->output_bits_ <= 8) * 128;
   int32_t high_clip = (1 << (this->output_bits_ - 1)) - 1;
   int32_t low_clip = ~high_clip;
-  int left_shift = (24 - this->output_bits_) % 8;
+  int left_shift = (32 - this->output_bits_) % 8;
   size_t i, j;
   uint32_t clipped_samples = 0;
 
@@ -232,10 +232,18 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 }
 
 void Resampler::tpdf_dither_init_(int num_channels) {
-  this->tpdf_generators_ = (uint32_t *) malloc(num_channels * sizeof(uint32_t));
+  int generator_bytes = num_channels * sizeof(uint32_t);
+  uint8_t *seed = (uint8_t *) malloc(generator_bytes);
 
-  for (size_t i = 0; i < num_channels; ++i) {
-    this->tpdf_generators_[i] = esp_random();
+  uint32_t random_seed = esp_random();
+
+  this->tpdf_generators_ = (uint32_t *) seed;
+
+  while (generator_bytes--) {
+    *seed++ = random_seed >> 24;
+    random_seed = ((random_seed << 4) - random_seed) ^ 1;
+    random_seed = ((random_seed << 4) - random_seed) ^ 1;
+    random_seed = ((random_seed << 4) - random_seed) ^ 1;
   }
 }
 
