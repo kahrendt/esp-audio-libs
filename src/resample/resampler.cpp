@@ -206,7 +206,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   ResamplerResults results = {.frames_used = res.input_used,
                               .frames_generated = frames_generated,
-                              .predicted_frames_used = res.frames_to_process,
+                              .predicted_frames_used = frames_to_process,
                               .clipped_samples = clipped_samples};
   return results;
 }

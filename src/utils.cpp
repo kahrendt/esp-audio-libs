@@ -1,6 +1,6 @@
 #include "utils.h"
 
-void quantized_to_float(uint8_t *input_buffer, float *output_buffer, uint32_t num_samples, uint8_t input_bits,
+void quantized_to_float(const uint8_t *input_buffer, float *output_buffer, uint32_t num_samples, uint8_t input_bits,
                         float gain_db) {
   float gain = pow(10.0, gain_db / 20.0);
 
@@ -44,7 +44,7 @@ void quantized_to_float(uint8_t *input_buffer, float *output_buffer, uint32_t nu
   }
 }
 
-uint32_t float_to_quantized(float *input_buffer, uint8_t *output_buffer, uint32_t num_samples, uint8_t output_bits) {
+uint32_t float_to_quantized(const float *input_buffer, uint8_t *output_buffer, uint32_t num_samples, uint8_t output_bits) {
   float scalar = (static_cast<uint64_t>(1) << output_bits) / 2.0;
   int32_t offset = (output_bits <= 8) * 128;
   int32_t high_clip = (1 << (output_bits - 1)) - 1;
