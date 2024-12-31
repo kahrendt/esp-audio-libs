@@ -15,7 +15,7 @@ Resampler::~Resampler() {
   if (this->float_output_buffer_ != nullptr) {
     free(this->float_output_buffer_);
   }
-  
+
   if (this->tpdf_generators_ != nullptr) {
     free(this->tpdf_generators_);
   }
@@ -25,15 +25,17 @@ Resampler::~Resampler() {
   }
 };
 
-bool Resampler::initialize(float target_sample_rate, float source_sample_rate, uint8_t channels,
-                           uint16_t number_of_taps, uint16_t number_of_filters, bool use_pre_post_filter,
-                           bool subsample_interpolate) {
+bool Resampler::initialize(float target_sample_rate, float source_sample_rate, uint8_t input_bits, uint8_t output_bits,
+                           uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters,
+                           bool use_pre_post_filter, bool subsample_interpolate) {
+  this->input_bits_ = input_bits;
+  this->output_bits_ = output_bits;
   this->channels_ = channels;
   this->number_of_taps_ = number_of_taps;
   this->number_of_filters_ = number_of_filters;
 
-  this->error_ = (float*)malloc(channels*sizeof(float));
-  memset(this->error_, 0, channels*sizeof(float));
+  this->error_ = (float *) malloc(channels * sizeof(float));
+  memset(this->error_, 0, channels * sizeof(float));
 
   this->tpdf_dither_init_(channels);
 
@@ -101,16 +103,65 @@ bool Resampler::initialize(float target_sample_rate, float source_sample_rate, u
   return true;
 }
 
-void Resampler::resample(const int16_t *input, int16_t *output, size_t input_frames_available,
-                         size_t output_frames_free, size_t &frames_used, size_t &frames_generated,
+void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
+                         size_t output_frames_free, float gain, size_t &frames_used, size_t &frames_generated,
                          uint32_t &clipped_samples) {
   unsigned int necessary_frames = resampleGetRequiredSamples(this->resampler_, output_frames_free, this->sample_ratio_);
 
   unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
 
-  for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
-    this->float_input_buffer_[i] = static_cast<float>(input[i]) / 32768.0f;
+  gain = pow(10.0, gain/20.0);
+
+  if (this->input_bits_ <= 8) {
+    float gain_factor = gain / 128.0;
+
+    for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
+      this->float_input_buffer_[i] = ((int) input_buffer[i] - 128) * gain_factor;
+    }
+
+  } else if (this->input_bits_ <= 16) {
+    float gain_factor = gain / 32768.0;
+    unsigned int i, j;
+
+    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+      int16_t value = input_buffer[j++];
+      value += input_buffer[j++] << 8;
+      this->float_input_buffer_[i] = value * gain_factor;
+    }
+  } else if (this->input_bits_ <= 24) {
+    float gain_factor = gain / 8388608.0;
+    unsigned int i, j;
+
+    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+      int32_t value = input_buffer[j++];
+      value += input_buffer[j++] << 8;
+      value += (int32_t) (signed char) input_buffer[j++] << 16;
+      this->float_input_buffer_[i] = value * gain_factor;
+    }
+  } else if (this->input_bits_ <= 32) {
+    float gain_factor = gain / 2147483647.0;
+    unsigned int i, j;
+
+    for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
+      int32_t value = input_buffer[j++];
+      value += input_buffer[j++] << 8;
+      value += (int32_t) (signed char) input_buffer[j++] << 16;
+      value += (int32_t) (signed char) input_buffer[j++] << 24;
+      this->float_input_buffer_[i] = value * gain_factor;
+    }
   }
+
+  // for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
+  //   float divisor = 1;
+  //   if (this->input_bits_ <= 8) {
+  //     divisor = 128.0;
+  //   } else if (this->input_bits_ <= 16) {
+  //     divisor = 32768.0;
+  //   } else if (this->input_bits_ <= 24) {
+  //     divisor = 8388608.0
+  //   }
+  //   this->float_input_buffer_[i] = static_cast<float>(input[i]) / 32768.0f;
+  // }
 
   if (this->pre_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
@@ -135,21 +186,23 @@ void Resampler::resample(const int16_t *input, int16_t *output, size_t input_fra
 
   const size_t samples_generated = frames_generated * this->channels_;
 
-  const uint8_t out_bits = 16;
+  // const uint8_t out_bits = 16;
 
-  float scaler = (1 << out_bits) / 2.0;
-  int32_t offset = (out_bits <= 8) * 128;
-  int32_t high_clip = (1 << (out_bits - 1)) - 1;
+
+  float scaler = (1 << this->output_bits_) / 2.0;
+  int32_t offset = (this->output_bits_ <= 8) * 128;
+  int32_t high_clip = (1 << (this->output_bits_ - 1)) - 1;
   int32_t low_clip = ~high_clip;
-  int left_shift = (24 - out_bits) % 8;
+  int left_shift = (24 - this->output_bits_) % 8;
   size_t i, j;
   clipped_samples = 0;
 
-  uint8_t *temp_buffer = (uint8_t*)(output);
+  // uint8_t *temp_buffer = (uint8_t *) (output);
 
   for (i = j = 0; i < samples_generated; ++i) {
     uint8_t chan = i % this->channels_;
-    int32_t output = floor((this->float_output_buffer_[i] *= scaler) - this->error_[chan] + this->tpdf_dither_(chan, -1) + 0.5);
+    int32_t output =
+        floor((this->float_output_buffer_[i] *= scaler) - this->error_[chan] + this->tpdf_dither_(chan, -1) + 0.5);
     if (output > high_clip) {
       ++clipped_samples;
       output = high_clip;
@@ -160,19 +213,22 @@ void Resampler::resample(const int16_t *input, int16_t *output, size_t input_fra
 
     this->error_[chan] += output - this->float_output_buffer_[i];
     output = (output << left_shift) + offset;
-    temp_buffer[j++] = output = (output << left_shift) + offset;
-    if (out_bits > 8) {
-      temp_buffer[j++] = output >> 8;
+    output_buffer[j++] = output = (output << left_shift) + offset;
+    if (this->output_bits_ > 8) {
+      output_buffer[j++] = output >> 8;
 
-      if (out_bits > 16) {
-        temp_buffer[j++] = output >> 16;
+      if (this->output_bits_ > 16) {
+        output_buffer[j++] = output >> 16;
+      }
+      if (this->output_bits_ > 24) {
+        output_buffer[j++] = output >> 24;
       }
     }
   }
 }
 
 void Resampler::tpdf_dither_init_(int num_channels) {
-  this->tpdf_generators_ = (uint32_t*) malloc(num_channels*sizeof(uint32_t));
+  this->tpdf_generators_ = (uint32_t *) malloc(num_channels * sizeof(uint32_t));
 
   for (size_t i = 0; i < num_channels; ++i) {
     this->tpdf_generators_[i] = esp_random();

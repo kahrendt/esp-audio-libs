@@ -21,26 +21,30 @@ class Resampler {
   /// @brief Initializes the resampler
   /// @param target_sample_rate Output sample rate
   /// @param source_sample_rate Input sample rate
+  /// @param input_bits Number of bits in the incoming audio samples
+  /// @param output_bits Number of bits in the output audio samples
   /// @param channels Source audio's number of channels
   /// @param number_of_taps Number of taps per filter. Must be a multiple of 4.
   /// @param number_of_filters Number of windowed-sinc filters. Must be greater than 1.
   /// @param use_pre_post_filter Enable a cascading biquad filter before or after the FIR filter
   /// @param subsample_interpolate Linearly interpolate the output sample with the two nearest sinc filters
   /// @return True if buffers were allocated succesfully, false otherwise.
-  bool initialize(float target_sample_rate, float source_sample_rate, uint8_t channels, uint16_t number_of_taps,
-                  uint16_t number_of_filters, bool use_pre_post_filter, bool subsample_interpolate);
+  bool initialize(float target_sample_rate, float source_sample_rate, uint8_t input_bits, uint8_t output_bits,
+                           uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters,
+                           bool use_pre_post_filter, bool subsample_interpolate) ;
 
   /// @brief Resamples the input samples to the initalized sample rate
-  /// @param input Pointer to int16_t source samples
-  /// @param output Pointer to write resamples int16_t samples.
+  /// @param input Pointer to source samples as a uint8_t buffer
+  /// @param output Pointer to write resampled samples as a uint8_t buffer
   /// @param input_frames_available Frames available at the input source pointer
   /// @param output_frames_free Frames free at the output sink pointer
+  /// @param gain Gain (in dB) to apply before resampling
   /// @param frames_used size_t passed-by-reference variable that will store the number of frames processed from the
   /// input source
   /// @param frames_generated size_t passed-by-reference variable that will store the number of output frames generated
   /// @param clipped_samples uint32_t passed-by-reference variable that will stor ethe number of clipped samples
-  void resample(const int16_t *input, int16_t *output, size_t input_frames_available,
-                         size_t output_frames_free, size_t &frames_used, size_t &frames_generated,
+  void resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
+                         size_t output_frames_free, float gain, size_t &frames_used, size_t &frames_generated,
                          uint32_t &clipped_samples);
 
  protected:
@@ -67,6 +71,8 @@ class Resampler {
   bool pre_filter_{false};
   bool post_filter_{false};
 
+  uint8_t input_bits_;
+  uint8_t output_bits_;
   uint8_t channels_;
 
   uint32_t *tpdf_generators_{nullptr};
