@@ -19,6 +19,18 @@ struct ResamplerResults {
   uint32_t clipped_samples;
 };
 
+struct ResamplerConfiguration {
+  float source_sample_rate;
+  float target_sample_rate;
+  uint8_t source_bits_per_sample;
+  uint8_t target_bits_per_sample;
+  uint8_t channels;
+  bool use_pre_or_post_filter;
+  bool subsample_interpolate;
+  uint16_t number_of_taps;
+  uint16_t number_of_filters;
+};
+
 class Resampler {
  public:
   Resampler(size_t input_buffer_samples, size_t output_buffer_samples)
@@ -26,19 +38,9 @@ class Resampler {
   ~Resampler();
 
   /// @brief Initializes the resampler
-  /// @param source_sample_rate Input sample rate
-  /// @param target_sample_rate Output sample rate
-  /// @param input_bits Number of bits in the incoming audio samples
-  /// @param output_bits Number of bits in the output audio samples
-  /// @param channels Source audio's number of channels
-  /// @param number_of_taps Number of taps per filter. Must be a multiple of 4.
-  /// @param number_of_filters Number of windowed-sinc filters. Must be greater than 1.
-  /// @param use_pre_post_filter Enable a cascading biquad filter before or after the FIR filter
-  /// @param subsample_interpolate Linearly interpolate the output sample with the two nearest sinc filters
+  /// @param config ResamplerConfiguration
   /// @return True if buffers were allocated succesfully, false otherwise.
-  bool initialize(float source_sample_rate, float target_sample_rate, uint8_t input_bits, uint8_t output_bits,
-                  uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters, bool use_pre_post_filter,
-                  bool subsample_interpolate);
+  bool initialize(ResamplerConfiguration &config);
 
   /// @brief Resamples the input samples to the initalized sample rate
   /// @param input Pointer to source samples as a uint8_t buffer

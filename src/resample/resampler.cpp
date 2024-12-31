@@ -16,14 +16,12 @@ Resampler::~Resampler() {
   }
 };
 
-bool Resampler::initialize(float source_sample_rate, float target_sample_rate, uint8_t input_bits, uint8_t output_bits,
-                           uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters,
-                           bool use_pre_post_filter, bool subsample_interpolate) {
-  this->input_bits_ = input_bits;
-  this->output_bits_ = output_bits;
-  this->channels_ = channels;
-  this->number_of_taps_ = number_of_taps;
-  this->number_of_filters_ = number_of_filters;
+bool Resampler::initialize(ResamplerConfiguration &config) {
+  this->input_bits_ = config.source_bits_per_sample;
+  this->output_bits_ = config.target_bits_per_sample;
+  this->channels_ = config.channels;
+  this->number_of_taps_ = config.number_of_taps;
+  this->number_of_filters_ = config.number_of_filters;
 
   this->float_input_buffer_ =
       (float *) heap_caps_malloc(this->input_buffer_samples_ * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -37,11 +35,11 @@ bool Resampler::initialize(float source_sample_rate, float target_sample_rate, u
 
   int flags = 0;
 
-  if (subsample_interpolate) {
+  if (config.subsample_interpolate) {
     flags |= SUBSAMPLE_INTERPOLATE;
   }
 
-  this->sample_ratio_ = target_sample_rate / source_sample_rate;
+  this->sample_ratio_ = config.target_sample_rate / config.source_sample_rate;
 
   if (this->sample_ratio_ < 1.0) {
     this->lowpass_ratio_ -= (10.24 / this->number_of_taps_);
@@ -55,13 +53,13 @@ bool Resampler::initialize(float source_sample_rate, float target_sample_rate, u
       this->lowpass_ratio_ = this->sample_ratio_;
     }
   }
-  if (this->lowpass_ratio_ * this->sample_ratio_ < 0.98 && use_pre_post_filter) {
+  if (this->lowpass_ratio_ * this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter) {
     float cutoff = this->lowpass_ratio_ * this->sample_ratio_ / 2.0;
     biquad_lowpass(&this->lowpass_coeff_, cutoff);
     this->pre_filter_ = true;
   }
 
-  if (this->lowpass_ratio_ / this->sample_ratio_ < 0.98 && use_pre_post_filter && !this->pre_filter_) {
+  if (this->lowpass_ratio_ / this->sample_ratio_ < 0.98 && config.use_pre_or_post_filter && !this->pre_filter_) {
     float cutoff = this->lowpass_ratio_ / this->sample_ratio_ / 2.0;
     biquad_lowpass(&this->lowpass_coeff_, cutoff);
     this->post_filter_ = true;
