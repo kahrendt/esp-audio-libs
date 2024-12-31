@@ -15,6 +15,7 @@ namespace resampler {
 struct ResamplerResults {
   size_t frames_used;
   size_t frames_generated;
+  size_t predicted_frames_used;
   uint32_t clipped_samples;
 };
 
@@ -45,14 +46,9 @@ class Resampler {
   /// @param input_frames_available Frames available at the input source pointer
   /// @param output_frames_free Frames free at the output sink pointer
   /// @param gain Gain (in dB) to apply before resampling
-  /// @param frames_used size_t passed-by-reference variable that will store the number of frames processed from the
-  /// input source
-  /// @param frames_generated size_t passed-by-reference variable that will store the number of output frames generated
-  /// @param clipped_samples uint32_t passed-by-reference variable that will stor ethe number of clipped samples
+  /// @return (ResamplerResults) Information about the number of frames used and  generated
   ResamplerResults resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
                          size_t output_frames_free, float gain);
-                         //, size_t &frames_used, size_t &frames_generated,
-                         //uint32_t &clipped_samples);
 
  protected:
   float *float_input_buffer_{nullptr};

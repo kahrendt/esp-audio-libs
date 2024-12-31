@@ -91,9 +91,7 @@ bool Resampler::initialize(float target_sample_rate, float source_sample_rate, u
 }
 
 ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
-                                     size_t output_frames_free,
-                                     float gain) {  //, size_t &frames_used, size_t &frames_generated,
-                                                    // uint32_t &clipped_samples) {
+                                     size_t output_frames_free, float gain) {
   unsigned int necessary_frames = resampleGetRequiredSamples(this->resampler_, output_frames_free, this->sample_ratio_);
 
   unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
@@ -151,10 +149,6 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   size_t frames_generated = res.output_generated;
 
-  if (frames_to_process != res.input_used) {
-    printf("mismatch in frames to process %d and frames actually used %d\n", frames_to_process, res.input_used);
-  }
-
   if (this->post_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
       biquad_apply_buffer(&this->lowpass_[i][0], this->float_output_buffer_ + i, frames_generated, this->channels_);
@@ -166,7 +160,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   const size_t samples_generated = frames_generated * this->channels_;
 
-  float scaler = (static_cast<uint64_t>(1) << this->output_bits_) / 2.0;
+  float scalar = (static_cast<uint64_t>(1) << this->output_bits_) / 2.0;
   int32_t offset = (this->output_bits_ <= 8) * 128;
   int32_t high_clip = (1 << (this->output_bits_ - 1)) - 1;
   int32_t low_clip = ~high_clip;
@@ -174,11 +168,9 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   size_t i, j;
   uint32_t clipped_samples = 0;
 
-  printf("scaler multiple = %.3f\n", scaler);
-
   for (i = j = 0; i < samples_generated; ++i) {
     uint8_t chan = i % this->channels_;
-    int32_t output = floor((this->float_output_buffer_[i] * scaler) + 0.5);
+    int32_t output = floor((this->float_output_buffer_[i] * scalar) + 0.5);
     if (this->output_bits_ < 32) {
       if (output > high_clip) {
         ++clipped_samples;
@@ -210,8 +202,10 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
     }
   }
 
-  ResamplerResults results = {
-      .frames_used = frames_used, .frames_generated = frames_generated, .clipped_samples = clipped_samples};
+  ResamplerResults results = {.frames_used = frames_used,
+                              .frames_generated = frames_generated,
+                              .predicted_frames_used = frames_to_process,
+                              .clipped_samples = clipped_samples};
   return results;
 }
 
