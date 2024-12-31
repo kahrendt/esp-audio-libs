@@ -45,10 +45,10 @@ class Resampler {
   /// @param output Pointer to write resampled samples as a uint8_t buffer
   /// @param input_frames_available Frames available at the input source pointer
   /// @param output_frames_free Frames free at the output sink pointer
-  /// @param gain Gain (in dB) to apply before resampling
+  /// @param gain_db Gain (in dB) to apply before resampling
   /// @return (ResamplerResults) Information about the number of frames used and  generated
   ResamplerResults resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
-                         size_t output_frames_free, float gain);
+                         size_t output_frames_free, float gain_db);
 
  protected:
   float *float_input_buffer_{nullptr};

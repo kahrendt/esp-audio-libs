@@ -95,47 +95,8 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
 
-  quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process*this->channels_, this->input_bits_, gain_db);
-  // gain = pow(10.0, gain / 20.0);
-
-  // if (this->input_bits_ <= 8) {
-  //   float gain_factor = gain / 128.0;
-
-  //   for (unsigned int i = 0; i < frames_to_process * this->channels_; ++i) {
-  //     this->float_input_buffer_[i] = ((int) input_buffer[i] - 128) * gain_factor;
-  //   }
-
-  // } else if (this->input_bits_ <= 16) {
-  //   float gain_factor = gain / 32768.0;
-  //   unsigned int i, j;
-
-  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-  //     int16_t value = input_buffer[j++];
-  //     value += input_buffer[j++] << 8;
-  //     this->float_input_buffer_[i] = value * gain_factor;
-  //   }
-  // } else if (this->input_bits_ <= 24) {
-  //   float gain_factor = gain / 8388608.0;
-  //   unsigned int i, j;
-
-  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-  //     int32_t value = input_buffer[j++];
-  //     value += input_buffer[j++] << 8;
-  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
-  //     this->float_input_buffer_[i] = value * gain_factor;
-  //   }
-  // } else if (this->input_bits_ <= 32) {
-  //   float gain_factor = gain / 2147483648.0;
-  //   unsigned int i, j;
-
-  //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
-  //     int32_t value = input_buffer[j++];
-  //     value += input_buffer[j++] << 8;
-  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
-  //     value += (int32_t) (signed char) input_buffer[j++] << 24;
-  //     this->float_input_buffer_[i] = value * gain_factor;
-  //   }
-  // }
+  quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process * this->channels_, this->input_bits_,
+                     gain_db);
 
   if (this->pre_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
@@ -156,53 +117,10 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
     }
   }
 
-  // size_t frames_used = res.input_used;
-
   const size_t samples_generated = frames_generated * this->channels_;
 
-  uint32_t clipped_samples = float_to_quantized(this->float_output_buffer_, output_buffer, samples_generated, this->output_bits_);
-
-  // float scalar = (static_cast<uint64_t>(1) << this->output_bits_) / 2.0;
-  // int32_t offset = (this->output_bits_ <= 8) * 128;
-  // int32_t high_clip = (1 << (this->output_bits_ - 1)) - 1;
-  // int32_t low_clip = ~high_clip;
-  // int left_shift = (32 - this->output_bits_) % 8;
-  // size_t i, j;
-  // uint32_t clipped_samples = 0;
-
-  // for (i = j = 0; i < samples_generated; ++i) {
-  //   uint8_t chan = i % this->channels_;
-  //   int32_t output = floor((this->float_output_buffer_[i] * scalar) + 0.5);
-  //   if (this->output_bits_ < 32) {
-  //     if (output > high_clip) {
-  //       ++clipped_samples;
-  //       output = high_clip;
-  //     } else if (output < low_clip) {
-  //       ++clipped_samples;
-  //       output = low_clip;
-  //     }
-  //   } else {
-  //     if (this->float_output_buffer_[i] >= 1.0f) {
-  //       ++clipped_samples;
-  //       output = high_clip;
-  //     } else if (this->float_output_buffer_[i] < -1.0f) {
-  //       ++clipped_samples;
-  //       output = low_clip;
-  //     }
-  //   }
-
-  //   output_buffer[j++] = output = (output << left_shift) + offset;
-  //   if (this->output_bits_ > 8) {
-  //     output_buffer[j++] = output >> 8;
-
-  //     if (this->output_bits_ > 16) {
-  //       output_buffer[j++] = output >> 16;
-  //     }
-  //     if (this->output_bits_ > 24) {
-  //       output_buffer[j++] = output >> 24;
-  //     }
-  //   }
-  // }
+  uint32_t clipped_samples =
+      float_to_quantized(this->float_output_buffer_, output_buffer, samples_generated, this->output_bits_);
 
   ResamplerResults results = {.frames_used = res.input_used,
                               .frames_generated = frames_generated,
