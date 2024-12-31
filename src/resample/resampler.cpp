@@ -140,7 +140,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   //     this->float_input_buffer_[i] = value * gain_factor;
   //   }
   // } else if (this->input_bits_ <= 32) {
-  //   float gain_factor = gain / 2147483647.0;
+  //   float gain_factor = gain / 2147483648.0;
   //   unsigned int i, j;
 
   //   for (i = j = 0; i < frames_to_process * this->channels_; ++i) {
@@ -235,7 +235,7 @@ void Resampler::tpdf_dither_init_(int num_channels) {
   int generator_bytes = num_channels * sizeof(uint32_t);
   uint8_t *seed = (uint8_t *) malloc(generator_bytes);
 
-  uint32_t random_seed = esp_random();
+  uint32_t random_seed = 0x31415926; //esp_random();
 
   this->tpdf_generators_ = (uint32_t *) seed;
 
