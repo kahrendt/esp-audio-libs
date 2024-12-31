@@ -206,7 +206,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   for (i = j = 0; i < samples_generated; ++i) {
     uint8_t chan = i % this->channels_;
     int32_t output =
-        floor((this->float_output_buffer_[i] *= scaler) - this->error_[chan] + this->tpdf_dither_(chan, -1) + 0.5);
+        floor((this->float_output_buffer_[i] *= scaler));// - this->error_[chan] + this->tpdf_dither_(chan, -1) + 0.5);
     if (output > high_clip) {
       ++clipped_samples;
       output = high_clip;
@@ -215,7 +215,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
       output = low_clip;
     }
 
-    this->error_[chan] += output - this->float_output_buffer_[i];
+    // this->error_[chan] += output - this->float_output_buffer_[i];
     output = (output << left_shift) + offset;
     output_buffer[j++] = output = (output << left_shift) + offset;
     if (this->output_bits_ > 8) {
