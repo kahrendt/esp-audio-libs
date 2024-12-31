@@ -12,6 +12,12 @@ namespace resampler {
 
 // Class that wraps the ART resampler for straightforward use
 
+struct ResamplerResults {
+  size_t frames_used;
+  size_t frames_generated;
+  uint32_t clipped_samples;
+};
+
 class Resampler {
  public:
   Resampler(size_t input_buffer_samples, size_t output_buffer_samples)
@@ -43,9 +49,10 @@ class Resampler {
   /// input source
   /// @param frames_generated size_t passed-by-reference variable that will store the number of output frames generated
   /// @param clipped_samples uint32_t passed-by-reference variable that will stor ethe number of clipped samples
-  void resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
-                         size_t output_frames_free, float gain, size_t &frames_used, size_t &frames_generated,
-                         uint32_t &clipped_samples);
+  ResamplerResults resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
+                         size_t output_frames_free, float gain);
+                         //, size_t &frames_used, size_t &frames_generated,
+                         //uint32_t &clipped_samples);
 
  protected:
   void tpdf_dither_init_(int num_channels);

@@ -103,14 +103,15 @@ bool Resampler::initialize(float target_sample_rate, float source_sample_rate, u
   return true;
 }
 
-void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
-                         size_t output_frames_free, float gain, size_t &frames_used, size_t &frames_generated,
-                         uint32_t &clipped_samples) {
+ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
+                                     size_t output_frames_free,
+                                     float gain) {  //, size_t &frames_used, size_t &frames_generated,
+                                                    // uint32_t &clipped_samples) {
   unsigned int necessary_frames = resampleGetRequiredSamples(this->resampler_, output_frames_free, this->sample_ratio_);
 
   unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
 
-  gain = pow(10.0, gain/20.0);
+  gain = pow(10.0, gain / 20.0);
 
   if (this->input_bits_ <= 8) {
     float gain_factor = gain / 128.0;
@@ -173,7 +174,7 @@ void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, si
   ResampleResult res = resampleProcessInterleaved(this->resampler_, this->float_input_buffer_, frames_to_process,
                                                   this->float_output_buffer_, output_frames_free, this->sample_ratio_);
 
-  frames_generated = res.output_generated;
+  size_t frames_generated = res.output_generated;
 
   if (this->post_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
@@ -182,12 +183,11 @@ void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, si
     }
   }
 
-  frames_used = res.input_used;
+  size_t frames_used = res.input_used;
 
   const size_t samples_generated = frames_generated * this->channels_;
 
   // const uint8_t out_bits = 16;
-
 
   float scaler = (1 << this->output_bits_) / 2.0;
   int32_t offset = (this->output_bits_ <= 8) * 128;
@@ -195,7 +195,7 @@ void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, si
   int32_t low_clip = ~high_clip;
   int left_shift = (24 - this->output_bits_) % 8;
   size_t i, j;
-  clipped_samples = 0;
+  uint32_t clipped_samples = 0;
 
   // uint8_t *temp_buffer = (uint8_t *) (output);
 
@@ -225,6 +225,10 @@ void Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, si
       }
     }
   }
+
+  ResamplerResults results = {
+      .frames_used = frames_used, .frames_generated = frames_generated, .clipped_samples = clipped_samples};
+  return results;
 }
 
 void Resampler::tpdf_dither_init_(int num_channels) {
