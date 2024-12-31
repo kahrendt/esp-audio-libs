@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "art_resampler.h"
 #include "art_biquad.h"
+#include "art_resampler.h"
 
 #include <algorithm>
 #include <esp_heap_caps.h>
