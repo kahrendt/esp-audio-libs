@@ -176,6 +176,10 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   size_t frames_generated = res.output_generated;
 
+  if (frames_to_process != res.input_used) {
+    printf("mismatch in frames to process %d and frames actually used %d\n", frames_to_process, res.input_used);
+  }
+
   if (this->post_filter_) {
     for (int i = 0; i < this->channels_; ++i) {
       biquad_apply_buffer(&this->lowpass_[i][0], this->float_output_buffer_ + i, frames_generated, this->channels_);
@@ -235,7 +239,7 @@ void Resampler::tpdf_dither_init_(int num_channels) {
   int generator_bytes = num_channels * sizeof(uint32_t);
   uint8_t *seed = (uint8_t *) malloc(generator_bytes);
 
-  uint32_t random_seed = 0x31415926; //esp_random();
+  uint32_t random_seed = esp_random();
 
   this->tpdf_generators_ = (uint32_t *) seed;
 
