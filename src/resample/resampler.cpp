@@ -16,7 +16,7 @@ Resampler::~Resampler() {
   }
 };
 
-bool Resampler::initialize(float target_sample_rate, float source_sample_rate, uint8_t input_bits, uint8_t output_bits,
+bool Resampler::initialize(float source_sample_rate, float target_sample_rate, uint8_t input_bits, uint8_t output_bits,
                            uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters,
                            bool use_pre_post_filter, bool subsample_interpolate) {
   this->input_bits_ = input_bits;

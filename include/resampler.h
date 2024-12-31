@@ -26,8 +26,8 @@ class Resampler {
   ~Resampler();
 
   /// @brief Initializes the resampler
-  /// @param target_sample_rate Output sample rate
   /// @param source_sample_rate Input sample rate
+  /// @param target_sample_rate Output sample rate
   /// @param input_bits Number of bits in the incoming audio samples
   /// @param output_bits Number of bits in the output audio samples
   /// @param channels Source audio's number of channels
@@ -36,9 +36,9 @@ class Resampler {
   /// @param use_pre_post_filter Enable a cascading biquad filter before or after the FIR filter
   /// @param subsample_interpolate Linearly interpolate the output sample with the two nearest sinc filters
   /// @return True if buffers were allocated succesfully, false otherwise.
-  bool initialize(float target_sample_rate, float source_sample_rate, uint8_t input_bits, uint8_t output_bits,
-                           uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters,
-                           bool use_pre_post_filter, bool subsample_interpolate) ;
+  bool initialize(float source_sample_rate, float target_sample_rate, uint8_t input_bits, uint8_t output_bits,
+                  uint8_t channels, uint16_t number_of_taps, uint16_t number_of_filters, bool use_pre_post_filter,
+                  bool subsample_interpolate);
 
   /// @brief Resamples the input samples to the initalized sample rate
   /// @param input Pointer to source samples as a uint8_t buffer
@@ -48,7 +48,7 @@ class Resampler {
   /// @param gain_db Gain (in dB) to apply before resampling
   /// @return (ResamplerResults) Information about the number of frames used and  generated
   ResamplerResults resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
-                         size_t output_frames_free, float gain_db);
+                            size_t output_frames_free, float gain_db);
 
  protected:
   float *float_input_buffer_{nullptr};
