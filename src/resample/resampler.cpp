@@ -1,9 +1,6 @@
 #include "resampler.h"
 #include "utils.h"
 
-#include <esp_timer.h>
-
-
 namespace resampler {
 
 Resampler::~Resampler() {
@@ -106,10 +103,8 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   }
   uint32_t conversion_time = 0;
   if (this->requires_resampling_) {
-    uint32_t start_time = esp_timer_get_time()/1000;
     quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process * this->channels_, this->input_bits_,
                        gain_db);
-    conversion_time += (esp_timer_get_time()/1000-start_time);
   } else {
     // Just converting the bits per sample
     quantized_to_float(input_buffer, this->float_output_buffer_, frames_to_process * this->channels_, this->input_bits_,
@@ -143,11 +138,9 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
     }
   }
 
-  uint32_t start_time = esp_timer_get_time()/1000;
   uint32_t clipped_samples = float_to_quantized(this->float_output_buffer_, output_buffer,
                                                 frames_generated * this->channels_, this->output_bits_);
-  conversion_time += (esp_timer_get_time()/1000-start_time);
-  // printf("conversion time %dms\n", conversion_time);
+
   ResamplerResults results = {.frames_used = frames_used,
                               .frames_generated = frames_generated,
                               .predicted_frames_used = frames_to_process,
