@@ -1,47 +1,62 @@
 #include "utils.h"
 
+float toFloat(int i)
+{
+	float result;
+	asm("FLOAT.S %0, %1, 15\t\n"
+		: "=f" (result)
+		: "a" (i));
+	return result;
+}
+
 void quantized_to_float(const uint8_t *input_buffer, float *output_buffer, uint32_t num_samples, uint8_t input_bits,
                         float gain_db) {
   float gain = pow(10.0, gain_db / 20.0);
 
-  if (input_bits <= 8) {
-    float gain_factor = gain / 128.0;
 
+  if (input_bits == 16) {
     for (unsigned int i = 0; i < num_samples; ++i) {
-      output_buffer[i] = ((int) input_buffer[i] - 128) * gain_factor;
-    }
-
-  } else if (input_bits <= 16) {
-    float gain_factor = gain / 32768.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < num_samples; ++i) {
-      int16_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      output_buffer[i] = value * gain_factor;
-    }
-  } else if (input_bits <= 24) {
-    float gain_factor = gain / 8388608.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < num_samples; ++i) {
-      int32_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      value += (int32_t) (signed char) input_buffer[j++] << 16;
-      output_buffer[i] = value * gain_factor;
-    }
-  } else if (input_bits <= 32) {
-    float gain_factor = gain / 2147483648.0;
-    unsigned int i, j;
-
-    for (i = j = 0; i < num_samples; ++i) {
-      int32_t value = input_buffer[j++];
-      value += input_buffer[j++] << 8;
-      value += (int32_t) (signed char) input_buffer[j++] << 16;
-      value += (int32_t) (signed char) input_buffer[j++] << 24;
-      output_buffer[i] = value * gain_factor;
+      output_buffer[i] = toFloat(reinterpret_cast<const int16_t*>(input_buffer)[i]);
     }
   }
+  // if (input_bits <= 8) {
+  //   float gain_factor = gain / 128.0;
+
+  //   for (unsigned int i = 0; i < num_samples; ++i) {
+  //     output_buffer[i] = ((int) input_buffer[i] - 128) * gain_factor;
+  //   }
+
+  // } else if (input_bits <= 16) {
+  //   float gain_factor = gain / 32768.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < num_samples; ++i) {
+  //     int16_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     output_buffer[i] = value * gain_factor;
+  //   }
+  // } else if (input_bits <= 24) {
+  //   float gain_factor = gain / 8388608.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < num_samples; ++i) {
+  //     int32_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
+  //     output_buffer[i] = value * gain_factor;
+  //   }
+  // } else if (input_bits <= 32) {
+  //   float gain_factor = gain / 2147483648.0;
+  //   unsigned int i, j;
+
+  //   for (i = j = 0; i < num_samples; ++i) {
+  //     int32_t value = input_buffer[j++];
+  //     value += input_buffer[j++] << 8;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 16;
+  //     value += (int32_t) (signed char) input_buffer[j++] << 24;
+  //     output_buffer[i] = value * gain_factor;
+  //   }
+  // }
 }
 
 uint32_t float_to_quantized(const float *input_buffer, uint8_t *output_buffer, uint32_t num_samples, uint8_t output_bits) {
