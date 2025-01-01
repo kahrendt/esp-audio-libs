@@ -92,9 +92,15 @@ bool Resampler::initialize(ResamplerConfiguration &config) {
 
 ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *output_buffer, size_t input_frames_available,
                                      size_t output_frames_free, float gain_db) {
-  unsigned int necessary_frames = resampleGetRequiredSamples(this->resampler_, output_frames_free, this->sample_ratio_);
+  uint32_t frames_to_process = input_frames_available;
 
-  unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
+  if (this->requires_resampling_) {
+    const uint32_t necessary_frames =
+        resampleGetRequiredSamples(this->resampler_, output_frames_free, this->sample_ratio_);
+    frames_to_process = std::min(frames_to_process, necessary_frames);
+  } else {
+    frames_to_process = std::min(frames_to_process, output_frames_free);
+  }
 
   if (this->requires_resampling_) {
     quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process * this->channels_, this->input_bits_,
