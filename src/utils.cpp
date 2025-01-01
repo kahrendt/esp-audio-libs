@@ -1,22 +1,24 @@
 #include "utils.h"
 
-float toFloat(int i)
-{
-	float result;
-	asm("FLOAT.S %0, %1, 15\t\n"
-		: "=f" (result)
-		: "a" (i));
-	return result;
+float toFloat(int i) {
+  float result;
+  asm("FLOAT.S %0, %1, 15\t\n" : "=f"(result) : "a"(i));
+  return result;
+}
+
+int toFixed(float f) {
+  int result;
+  asm("ROUND.S %0, %1, 15\t\n" : "=a"(result) : "f"(f));
+  return result;
 }
 
 void quantized_to_float(const uint8_t *input_buffer, float *output_buffer, uint32_t num_samples, uint8_t input_bits,
                         float gain_db) {
   float gain = pow(10.0, gain_db / 20.0);
 
-
   if (input_bits == 16) {
     for (unsigned int i = 0; i < num_samples; ++i) {
-      output_buffer[i] = toFloat(reinterpret_cast<const int16_t*>(input_buffer)[i]);
+      output_buffer[i] = toFloat(reinterpret_cast<const int16_t *>(input_buffer)[i]);
     }
   }
   // if (input_bits <= 8) {
@@ -59,7 +61,8 @@ void quantized_to_float(const uint8_t *input_buffer, float *output_buffer, uint3
   // }
 }
 
-uint32_t float_to_quantized(const float *input_buffer, uint8_t *output_buffer, uint32_t num_samples, uint8_t output_bits) {
+uint32_t float_to_quantized(const float *input_buffer, uint8_t *output_buffer, uint32_t num_samples,
+                            uint8_t output_bits) {
   float scalar = (static_cast<uint64_t>(1) << output_bits) / 2.0;
   int32_t offset = (output_bits <= 8) * 128;
   int32_t high_clip = (1 << (output_bits - 1)) - 1;
@@ -68,38 +71,51 @@ uint32_t float_to_quantized(const float *input_buffer, uint8_t *output_buffer, u
   size_t i, j;
   uint32_t clipped_samples = 0;
 
-  for (i = j = 0; i < num_samples; ++i) {
-    int32_t output = floor((input_buffer[i] * scalar) + 0.5);
-    if (output_bits < 32) {
-      if (output > high_clip) {
-        ++clipped_samples;
-        output = high_clip;
-      } else if (output < low_clip) {
-        ++clipped_samples;
-        output = low_clip;
-      }
-    } else {
-      if (input_buffer[i] >= 1.0f) {
-        ++clipped_samples;
-        output = high_clip;
-      } else if (input_buffer[i] < -1.0f) {
-        ++clipped_samples;
-        output = low_clip;
-      }
+  for (i = 0; i < num_samples; ++i) {
+    int32_t output = toFixed(input_buffer[i]);
+    if (output > high_clip) {
+      ++clipped_samples;
+      output = high_clip;
+    } else if (output < low_clip) {
+      ++clipped_samples;
+      output = low_clip;
     }
 
-    output_buffer[j++] = output = (output << left_shift) + offset;
-    if (output_bits > 8) {
-      output_buffer[j++] = output >> 8;
-
-      if (output_bits > 16) {
-        output_buffer[j++] = output >> 16;
-      }
-      if (output_bits > 24) {
-        output_buffer[j++] = output >> 24;
-      }
-    }
+    reinterpret_cast<int16_t*>(output_buffer)[i] = output;
   }
+
+  // for (i = j = 0; i < num_samples; ++i) {
+  //   int32_t output = floor((input_buffer[i] * scalar) + 0.5);
+  //   if (output_bits < 32) {
+  //     if (output > high_clip) {
+  //       ++clipped_samples;
+  //       output = high_clip;
+  //     } else if (output < low_clip) {
+  //       ++clipped_samples;
+  //       output = low_clip;
+  //     }
+  //   } else {
+  //     if (input_buffer[i] >= 1.0f) {
+  //       ++clipped_samples;
+  //       output = high_clip;
+  //     } else if (input_buffer[i] < -1.0f) {
+  //       ++clipped_samples;
+  //       output = low_clip;
+  //     }
+  //   }
+
+  //   output_buffer[j++] = output = (output << left_shift) + offset;
+  //   if (output_bits > 8) {
+  //     output_buffer[j++] = output >> 8;
+
+  //     if (output_bits > 16) {
+  //       output_buffer[j++] = output >> 16;
+  //     }
+  //     if (output_bits > 24) {
+  //       output_buffer[j++] = output >> 24;
+  //     }
+  //   }
+  // }
 
   return clipped_samples;
 }

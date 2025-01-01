@@ -147,7 +147,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
   uint32_t clipped_samples = float_to_quantized(this->float_output_buffer_, output_buffer,
                                                 frames_generated * this->channels_, this->output_bits_);
   conversion_time += (esp_timer_get_time()/1000-start_time);
-  printf("conversion time %dms\n", conversion_time);
+  // printf("conversion time %dms\n", conversion_time);
   ResamplerResults results = {.frames_used = frames_used,
                               .frames_generated = frames_generated,
                               .predicted_frames_used = frames_to_process,
