@@ -85,13 +85,13 @@ esp_err_t dsps_add_s16_ae32(const int16_t *input1, const int16_t *input2, int16_
 esp_err_t dsps_add_s16_aes3(const int16_t *input1, const int16_t *input2, int16_t *output, int len, int step1,
                             int step2, int step_out, int shift);
 
-//#if (dsps_dotprod_f32_aes3_enabled == 1)
-//#define dsps_dotprod_f32 dsps_dotprod_f32_aes3
-//#elif (dotprod_f32_ae32_enabled == 1)
-//#define dsps_dotprod_f32 dsps_dotprod_f32_ae32
-//#else
+#if (dsps_dotprod_f32_aes3_enabled == 1)
+#define dsps_dotprod_f32 dsps_dotprod_f32_aes3
+#elif (dotprod_f32_ae32_enabled == 1)
+#define dsps_dotprod_f32 dsps_dotprod_f32_ae32
+#else
 #define dsps_dotprod_f32 dsps_dotprod_f32_ansi
-//#endif  // dsps_dotprod_f32_ae32_enabled
+#endif  // dsps_dotprod_f32_ae32_enabled
 
 #if (dsps_mulc_s16_ae32_enabled == 1)
 #define dsps_mulc_s16 dsps_mulc_s16_ae32
