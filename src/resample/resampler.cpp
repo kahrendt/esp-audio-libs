@@ -96,20 +96,20 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
 
   unsigned int frames_to_process = std::min(input_frames_available, necessary_frames);
 
-  // if (this->requires_resampling_) {
+  if (this->requires_resampling_) {
     quantized_to_float(input_buffer, this->float_input_buffer_, frames_to_process * this->channels_, this->input_bits_,
                        gain_db);
-  // } else {
-  //   // Just converting the bits per sample
-  //   quantized_to_float(input_buffer, this->float_output_buffer_, frames_to_process * this->channels_, this->input_bits_,
-  //                      gain_db);
-  // }
+  } else {
+    // Just converting the bits per sample
+    quantized_to_float(input_buffer, this->float_output_buffer_, frames_to_process * this->channels_, this->input_bits_,
+                       gain_db);
+  }
 
   size_t frames_used = frames_to_process;
   size_t frames_generated = frames_to_process;
   size_t predicted_frames_used = frames_to_process;
 
-  // if (this->requires_resampling_) {
+  if (this->requires_resampling_) {
     if (this->pre_filter_) {
       for (int i = 0; i < this->channels_; ++i) {
         biquad_apply_buffer(&this->lowpass_[i][0], this->float_input_buffer_ + i, frames_to_process, this->channels_);
@@ -130,7 +130,7 @@ ResamplerResults Resampler::resample(const uint8_t *input_buffer, uint8_t *outpu
         biquad_apply_buffer(&this->lowpass_[i][1], this->float_output_buffer_ + i, frames_generated, this->channels_);
       }
     }
-  // }
+  }
 
   uint32_t clipped_samples = float_to_quantized(this->float_output_buffer_, output_buffer,
                                                 frames_generated * this->channels_, this->output_bits_);
