@@ -221,7 +221,7 @@ FLACDecoderResult FLACDecoder::decode_frame_header_() {
   return FLAC_DECODER_SUCCESS;
 }
 
-FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_length, int16_t *output_buffer,
+FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_length, uint8_t *output_buffer,
                                             uint32_t *num_samples) {
   this->buffer_ = buffer;
   this->buffer_index_ = 0;
@@ -274,23 +274,40 @@ FLACDecoderResult FLACDecoder::decode_frame(uint8_t *buffer, size_t buffer_lengt
   this->read_uint(16);
 
   int32_t addend = 0;
-  // int8_t shift = this->sample_depth_ - 16;
   if (this->sample_depth_ == 8) {
     addend = 128;
   }
 
+  int left_shift = (32-this->sample_depth_) % 8;
+
   // Copy samples to output buffer
   std::size_t output_index = 0;
-  for (uint32_t i = 0; i < this->curr_frame_block_size_; i++) {
-    for (uint32_t j = 0; j < this->num_channels_; j++) {
-      int32_t sample_value = this->block_samples_[(j * this->curr_frame_block_size_) + i] + addend;
-      if (this->sample_depth_ == 16) {
-        output_buffer[output_index++] = sample_value;
-      } else if (this->sample_depth_ == 24) {
-        output_buffer[output_index++] = sample_value >> 8;
-      } else if (this->sample_depth_ == 32) {
-        output_buffer[output_index++] = sample_value >> 16;
+  for (uint32_t i = 0; i < this->curr_frame_block_size_; ++i) {
+    for (uint32_t j = 0; j < this->num_channels_; ++j) {
+      int32_t output = this->block_samples_[(j * this->curr_frame_block_size_) + i] + addend;
+
+      // Align the data to the nearest byte
+      output_buffer[output_index++] = output = (output << left_shift);
+
+      if (this->sample_depth_ > 8) {
+        output_buffer[output_index++] = output >> 8;
+
+        if (this->sample_depth_ > 16) {
+          output_buffer[output_index++] = output >> 16;
+        }
+        if (this->sample_depth_ > 24) {
+          output_buffer[output_index++] = output >> 24;
+        }
       }
+
+
+      // if (this->sample_depth_ == 16) {
+      //   output_buffer[output_index++] = sample_value;
+      // } else if (this->sample_depth_ == 24) {
+      //   output_buffer[output_index++] = sample_value >> 8;
+      // } else if (this->sample_depth_ == 32) {
+      //   output_buffer[output_index++] = sample_value >> 16;
+      // }
     }
   }
 

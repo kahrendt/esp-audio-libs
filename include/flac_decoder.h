@@ -58,7 +58,7 @@ class FLACDecoder {
   /* Decodes a single frame of audio.
    * Copies num_samples into output_buffer.
    * Use get_output_buffer_size() to allocate output_buffer. */
-  FLACDecoderResult decode_frame(uint8_t *buffer, size_t buffer_length, int16_t *output_buffer, uint32_t *num_samples);
+  FLACDecoderResult decode_frame(uint8_t *buffer, size_t buffer_length, uint8_t *output_buffer, uint32_t *num_samples);
 
   /* Frees internal memory. */
   void free_buffers();
@@ -85,7 +85,7 @@ class FLACDecoder {
 
   /* Maximum number of output samples per frame (after read_header()) */
   uint32_t get_output_buffer_size_bytes() {
-    return this->max_block_size_ * this->num_channels_ * 16 / 8;  // this->sample_depth_ / 8;
+    return this->max_block_size_ * this->num_channels_ * (this->sample_depth_ + 7) / 8;  // align to the nearest byte
   }
 
   std::size_t get_bytes_index() { return this->buffer_index_; }
