@@ -1,7 +1,7 @@
 # esp-audio-libs
 
 A collection of libraries and functions that are useful for playing audio on ESP32 devices. It includes code based on the following:
-- [esp-dsp](https://github.com/espressif/esp-dsp) assembly functions for floating point dot products and Q15 fixed point addition and constant multipliction.
+- [esp-dsp](https://github.com/espressif/esp-dsp) assembly functions for floating point dot product and biquad IIR filters and Q15 fixed point addition and constant multipliction.
     - Author: Espressif
     - License: Apache v2.0
 - [ART-resampler](https://github.com/dbry/audio-resampler) for resampling audio, optimized with assembly dot product functions.

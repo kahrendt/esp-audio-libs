@@ -14,12 +14,12 @@
 
 #include "dsp.h"
 
-esp_err_t dsps_dotprod_f32_ansi(const float *src1, const float *src2, float *dest, int len) {
-  float acc = 0;
+esp_err_t dsps_biquad_f32_ansi(const float *input, float *output, int len, float *coef, float *w) {
   for (int i = 0; i < len; i++) {
-    acc += src1[i] * src2[i];
+    float d0 = input[i] - coef[3] * w[0] - coef[4] * w[1];
+    output[i] = coef[0] * d0 + coef[1] * w[0] + coef[2] * w[1];
+    w[1] = w[0];
+    w[0] = d0;
   }
-  *dest = acc;
-
   return ESP_OK;
 }
