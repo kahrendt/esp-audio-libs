@@ -540,11 +540,11 @@ void IRAM_ATTR FLACDecoder::restore_linear_prediction(int32_t *sub_frame_buffer,
   const size_t coefs_size = coefs.size();
   const size_t samples_to_restore = num_of_samples - coefs_size + 1;
   for (std::size_t i = 0; i < samples_to_restore; i++) {
-    int32_t sum = 0;
+    int64_t sum = 0;
     for (std::size_t j = 0; j < coefs_size; ++j) {
-      sum += (sub_frame_buffer[i + j] * coefs[j]);
+      sum += static_cast<int64_t>(sub_frame_buffer[i + j]) * static_cast<int64_t>(coefs[j]);
     }
-    sub_frame_buffer[i + coefs_size - 1] = (sum >> shift);
+    sub_frame_buffer[i + coefs_size - 1] = static_cast<int32_t>(sum >> shift);
   }
 }  // restore_linear_prediction
 
