@@ -535,7 +535,7 @@ FLACDecoderResult FLACDecoder::decode_residuals(int32_t *sub_frame_buffer, size_
   return FLAC_DECODER_SUCCESS;
 }  // decode_residuals
 
-void FLACDecoder::restore_linear_prediction(int32_t *sub_frame_buffer, size_t num_of_samples,
+void IRAM_ATTR FLACDecoder::restore_linear_prediction(int32_t *sub_frame_buffer, size_t num_of_samples,
                                                       const std::vector<int16_t> &coefs, int32_t shift) {
   const size_t coefs_size = coefs.size();
   const size_t samples_to_restore = num_of_samples - coefs_size + 1;
