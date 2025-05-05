@@ -538,9 +538,9 @@ FLACDecoderResult FLACDecoder::decode_residuals(int32_t *sub_frame_buffer, size_
 void FLACDecoder::restore_linear_prediction(int32_t *sub_frame_buffer, size_t num_of_samples,
                                             const std::vector<int32_t> &coefs, int32_t shift) {
   for (std::size_t i = 0; i < num_of_samples - coefs.size() + 1; i++) {
-    int32_t sum = 0;
+    int64_t sum = 0;
     for (std::size_t j = 0; j < coefs.size(); ++j) {
-      sum += (sub_frame_buffer[i + j] * coefs[j]);
+      sum += (static_cast<int64_t>(sub_frame_buffer[i + j]) * static_cast<int64_t>(coefs[j]));
     }
     sub_frame_buffer[i + coefs.size() - 1] = (sum >> shift);
   }
