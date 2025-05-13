@@ -31,4 +31,4 @@ if(ESP_PLATFORM)
   return()
 endif()
 
-project(esp-audio-libs VERSION 1.0.1)
+project(esp-audio-libs VERSION 1.1.5)
