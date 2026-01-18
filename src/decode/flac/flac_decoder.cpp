@@ -241,22 +241,36 @@ FLACDecoderResult FLACDecoder::decode_frame(const uint8_t *buffer, size_t buffer
     }
   }
 
-  uint32_t bytes_per_sample = (this->curr_frame_sample_depth_ + 7) / 8;
-  uint32_t shift_amount = 0;
-  if (this->curr_frame_sample_depth_ % 8 != 0) {
-    shift_amount = 8 - (this->curr_frame_sample_depth_ % 8);
-  }
-
   // Write decoded samples to output buffer using optimized fast paths
-  if (this->curr_frame_sample_depth_ == 16 && shift_amount == 0 && this->num_channels_ == 2) {
-    this->write_samples_16bit_stereo(output_buffer, this->curr_frame_block_size_);
-  } else if (this->curr_frame_sample_depth_ == 16 && shift_amount == 0 && this->num_channels_ == 1) {
-    this->write_samples_16bit_mono(output_buffer, this->curr_frame_block_size_);
-  } else if (this->curr_frame_sample_depth_ == 24 && shift_amount == 0 && this->num_channels_ == 2) {
-    this->write_samples_24bit_stereo(output_buffer, this->curr_frame_block_size_);
+  if (this->output_32bit_samples_) {
+    // 32-bit output mode: all samples output as 4 bytes, left-justified (MSB-aligned)
+    uint32_t shift_amount = 32 - this->curr_frame_sample_depth_;
+
+    if (this->num_channels_ == 2) {
+      this->write_samples_32bit_stereo(output_buffer, this->curr_frame_block_size_, shift_amount);
+    } else if (this->num_channels_ == 1) {
+      this->write_samples_32bit_mono(output_buffer, this->curr_frame_block_size_, shift_amount);
+    } else {
+      this->write_samples_32bit_general(output_buffer, this->curr_frame_block_size_, shift_amount);
+    }
   } else {
-    this->write_samples_general(output_buffer, this->curr_frame_block_size_, bytes_per_sample, shift_amount,
-                                this->curr_frame_sample_depth_);
+    // Native output mode: pack to nearest byte boundary
+    uint32_t bytes_per_sample = (this->curr_frame_sample_depth_ + 7) / 8;
+    uint32_t shift_amount = 0;
+    if (this->curr_frame_sample_depth_ % 8 != 0) {
+      shift_amount = 8 - (this->curr_frame_sample_depth_ % 8);
+    }
+
+    if (this->curr_frame_sample_depth_ == 16 && shift_amount == 0 && this->num_channels_ == 2) {
+      this->write_samples_16bit_stereo(output_buffer, this->curr_frame_block_size_);
+    } else if (this->curr_frame_sample_depth_ == 16 && shift_amount == 0 && this->num_channels_ == 1) {
+      this->write_samples_16bit_mono(output_buffer, this->curr_frame_block_size_);
+    } else if (this->curr_frame_sample_depth_ == 24 && shift_amount == 0 && this->num_channels_ == 2) {
+      this->write_samples_24bit_stereo(output_buffer, this->curr_frame_block_size_);
+    } else {
+      this->write_samples_general(output_buffer, this->curr_frame_block_size_, bytes_per_sample, shift_amount,
+                                  this->curr_frame_sample_depth_);
+    }
   }
 
   this->reset_bit_buffer();
@@ -265,90 +279,22 @@ FLACDecoderResult FLACDecoder::decode_frame(const uint8_t *buffer, size_t buffer
 
 FLAC_OPTIMIZE_O3
 void FLACDecoder::write_samples_16bit_stereo(uint8_t *output_buffer, uint32_t block_size) {
-  // 16-bit stereo fast path with 4-sample unrolling
-  std::size_t output_index = 0;
-  uint32_t i = 0;
-  const uint32_t unroll_limit = block_size & ~3U;  // Round down to multiple of 4
+  // 16-bit mono fast path
+  int16_t *output_samples = reinterpret_cast<int16_t *>(output_buffer);
 
-  // Process 4 samples at a time
-  for (; i < unroll_limit; i += 4) {
-    // Sample 0 - Left and Right channels
-    int32_t sample_0_l = this->block_samples_[i];
-    int32_t sample_0_r = this->block_samples_[block_size + i];
-    // Sample 1 - Left and Right channels
-    int32_t sample_1_l = this->block_samples_[i + 1];
-    int32_t sample_1_r = this->block_samples_[block_size + i + 1];
-    // Sample 2 - Left and Right channels
-    int32_t sample_2_l = this->block_samples_[i + 2];
-    int32_t sample_2_r = this->block_samples_[block_size + i + 2];
-    // Sample 3 - Left and Right channels
-    int32_t sample_3_l = this->block_samples_[i + 3];
-    int32_t sample_3_r = this->block_samples_[block_size + i + 3];
-
-    // Direct 16-bit writes (little-endian)
-    output_buffer[output_index++] = sample_0_l & 0xFF;
-    output_buffer[output_index++] = (sample_0_l >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_0_r & 0xFF;
-    output_buffer[output_index++] = (sample_0_r >> 8) & 0xFF;
-
-    output_buffer[output_index++] = sample_1_l & 0xFF;
-    output_buffer[output_index++] = (sample_1_l >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_1_r & 0xFF;
-    output_buffer[output_index++] = (sample_1_r >> 8) & 0xFF;
-
-    output_buffer[output_index++] = sample_2_l & 0xFF;
-    output_buffer[output_index++] = (sample_2_l >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_2_r & 0xFF;
-    output_buffer[output_index++] = (sample_2_r >> 8) & 0xFF;
-
-    output_buffer[output_index++] = sample_3_l & 0xFF;
-    output_buffer[output_index++] = (sample_3_l >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_3_r & 0xFF;
-    output_buffer[output_index++] = (sample_3_r >> 8) & 0xFF;
-  }
-
-  // Handle remaining samples
-  for (; i < block_size; i++) {
-    int32_t sample_l = this->block_samples_[i];
-    int32_t sample_r = this->block_samples_[block_size + i];
-
-    output_buffer[output_index++] = sample_l & 0xFF;
-    output_buffer[output_index++] = (sample_l >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_r & 0xFF;
-    output_buffer[output_index++] = (sample_r >> 8) & 0xFF;
+  for (uint32_t i = 0; i < block_size; ++i) {
+    output_samples[2 * i] = this->block_samples_[i];
+    output_samples[2 * i + 1] = this->block_samples_[block_size + i];
   }
 }
 
 FLAC_OPTIMIZE_O3
 void FLACDecoder::write_samples_16bit_mono(uint8_t *output_buffer, uint32_t block_size) {
-  // 16-bit mono fast path with 4-sample unrolling
-  std::size_t output_index = 0;
-  uint32_t i = 0;
-  const uint32_t unroll_limit = block_size & ~3U;  // Round down to multiple of 4
+  // 16-bit mono fast path
+  int16_t *output_samples = reinterpret_cast<int16_t *>(output_buffer);
 
-  // Process 4 samples at a time
-  for (; i < unroll_limit; i += 4) {
-    int32_t sample_0 = this->block_samples_[i];
-    int32_t sample_1 = this->block_samples_[i + 1];
-    int32_t sample_2 = this->block_samples_[i + 2];
-    int32_t sample_3 = this->block_samples_[i + 3];
-
-    // Direct 16-bit writes (little-endian)
-    output_buffer[output_index++] = sample_0 & 0xFF;
-    output_buffer[output_index++] = (sample_0 >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_1 & 0xFF;
-    output_buffer[output_index++] = (sample_1 >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_2 & 0xFF;
-    output_buffer[output_index++] = (sample_2 >> 8) & 0xFF;
-    output_buffer[output_index++] = sample_3 & 0xFF;
-    output_buffer[output_index++] = (sample_3 >> 8) & 0xFF;
-  }
-
-  // Handle remaining samples
-  for (; i < block_size; i++) {
-    int32_t sample = this->block_samples_[i];
-    output_buffer[output_index++] = sample & 0xFF;
-    output_buffer[output_index++] = (sample >> 8) & 0xFF;
+  for (uint32_t i = 0; i < block_size; ++i) {
+    output_samples[i] = this->block_samples_[i];
   }
 }
 
@@ -444,6 +390,40 @@ void FLACDecoder::write_samples_general(uint8_t *output_buffer, uint32_t block_s
       for (uint32_t byte = 0; byte < bytes_per_sample; byte++) {
         output_buffer[output_index++] = (sample >> (byte * 8)) & 0xFF;
       }
+    }
+  }
+}
+
+FLAC_OPTIMIZE_O3
+void FLACDecoder::write_samples_32bit_stereo(uint8_t *output_buffer, uint32_t block_size, uint32_t shift_amount) {
+  int32_t *output_samples = reinterpret_cast<int32_t *>(output_buffer);
+  const int32_t *left = this->block_samples_;
+  const int32_t *right = this->block_samples_ + block_size;
+
+  for (uint32_t i = 0; i < block_size; ++i) {
+    output_samples[i * 2] = left[i] << shift_amount;
+    output_samples[i * 2 + 1] = right[i] << shift_amount;
+  }
+}
+
+FLAC_OPTIMIZE_O3
+void FLACDecoder::write_samples_32bit_mono(uint8_t *output_buffer, uint32_t block_size, uint32_t shift_amount) {
+  int32_t *output_samples = reinterpret_cast<int32_t *>(output_buffer);
+  const int32_t *samples = this->block_samples_;
+
+  for (uint32_t i = 0; i < block_size; ++i) {
+    output_samples[i] = samples[i] << shift_amount;
+  }
+}
+
+FLAC_OPTIMIZE_O3
+void FLACDecoder::write_samples_32bit_general(uint8_t *output_buffer, uint32_t block_size, uint32_t shift_amount) {
+  int32_t *output_samples = reinterpret_cast<int32_t *>(output_buffer);
+  uint32_t output_index = 0;
+
+  for (uint32_t i = 0; i < block_size; ++i) {
+    for (uint32_t ch = 0; ch < this->num_channels_; ++ch) {
+      output_samples[output_index++] = this->block_samples_[ch * block_size + i] << shift_amount;
     }
   }
 }
@@ -627,9 +607,8 @@ FLACDecoderResult FLACDecoder::decode_frame_header() {
     frame_sample_rate = this->sample_rate_;
   } else {
     // Standard sample rate codes (1-11)
-    static const uint32_t sample_rate_table[] = {
-      88200, 176400, 192000, 8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000
-    };
+    static const uint32_t sample_rate_table[] = {88200, 176400, 192000, 8000,  16000, 22050,
+                                                 24000, 32000,  44100,  48000, 96000};
     if (sample_rate_code >= 1 && sample_rate_code <= 11) {
       frame_sample_rate = sample_rate_table[sample_rate_code - 1];
     } else {
