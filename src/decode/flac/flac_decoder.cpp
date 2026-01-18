@@ -689,15 +689,60 @@ FLACDecoderResult FLACDecoder::decode_subframes(uint32_t block_size, uint32_t sa
     }
 
     if (channel_assignment == 8) {
-      for (std::size_t i = 0; i < block_size; i++) {
+      // LEFT_SIDE: Right = Left - Side
+      // Process 4 samples at a time
+      std::size_t i = 0;
+      for (; i + 3 < block_size; i += 4) {
+        this->block_samples_[block_size + i] = this->block_samples_[i] - this->block_samples_[block_size + i];
+        this->block_samples_[block_size + i + 1] = this->block_samples_[i + 1] - this->block_samples_[block_size + i + 1];
+        this->block_samples_[block_size + i + 2] = this->block_samples_[i + 2] - this->block_samples_[block_size + i + 2];
+        this->block_samples_[block_size + i + 3] = this->block_samples_[i + 3] - this->block_samples_[block_size + i + 3];
+      }
+      // Handle remaining samples
+      for (; i < block_size; i++) {
         this->block_samples_[block_size + i] = this->block_samples_[i] - this->block_samples_[block_size + i];
       }
     } else if (channel_assignment == 9) {
-      for (std::size_t i = 0; i < block_size; i++) {
+      // SIDE_RIGHT: Left = Side + Right
+      // Process 4 samples at a time
+      std::size_t i = 0;
+      for (; i + 3 < block_size; i += 4) {
+        this->block_samples_[i] += this->block_samples_[block_size + i];
+        this->block_samples_[i + 1] += this->block_samples_[block_size + i + 1];
+        this->block_samples_[i + 2] += this->block_samples_[block_size + i + 2];
+        this->block_samples_[i + 3] += this->block_samples_[block_size + i + 3];
+      }
+      // Handle remaining samples
+      for (; i < block_size; i++) {
         this->block_samples_[i] += this->block_samples_[block_size + i];
       }
     } else if (channel_assignment == 10) {
-      for (std::size_t i = 0; i < block_size; i++) {
+      // MID_SIDE: Left = Mid + Side/2, Right = Mid - Side/2
+      // Process 4 samples at a time
+      std::size_t i = 0;
+      for (; i + 3 < block_size; i += 4) {
+        int32_t side0 = this->block_samples_[block_size + i];
+        int32_t right0 = this->block_samples_[i] - (side0 >> 1);
+        this->block_samples_[block_size + i] = right0;
+        this->block_samples_[i] = right0 + side0;
+
+        int32_t side1 = this->block_samples_[block_size + i + 1];
+        int32_t right1 = this->block_samples_[i + 1] - (side1 >> 1);
+        this->block_samples_[block_size + i + 1] = right1;
+        this->block_samples_[i + 1] = right1 + side1;
+
+        int32_t side2 = this->block_samples_[block_size + i + 2];
+        int32_t right2 = this->block_samples_[i + 2] - (side2 >> 1);
+        this->block_samples_[block_size + i + 2] = right2;
+        this->block_samples_[i + 2] = right2 + side2;
+
+        int32_t side3 = this->block_samples_[block_size + i + 3];
+        int32_t right3 = this->block_samples_[i + 3] - (side3 >> 1);
+        this->block_samples_[block_size + i + 3] = right3;
+        this->block_samples_[i + 3] = right3 + side3;
+      }
+      // Handle remaining samples
+      for (; i < block_size; i++) {
         int32_t side = this->block_samples_[block_size + i];
         int32_t right = this->block_samples_[i] - (side >> 1);
         this->block_samples_[block_size + i] = right;
