@@ -1018,7 +1018,8 @@ inline int32_t FLACDecoder::read_sint(std::size_t num_bits) {
 inline int32_t FLACDecoder::read_rice_sint(uint8_t param) {
   uint32_t unary_count = 0;
 
-  // Inline unary bit reading to avoid function call overhead
+  // Optimized unary bit reading using __builtin_clz (count leading zeros)
+  // The bit buffer stores valid bits in the MSB positions
   while (true) {
     // Check if we have bits available
     if (this->bit_buffer_length_ == 0) {
@@ -1029,15 +1030,27 @@ inline int32_t FLACDecoder::read_rice_sint(uint8_t param) {
       }
     }
 
-    // Extract next bit from MSB position
-    uint32_t bit = (this->bit_buffer_ >> (this->bit_buffer_length_ - 1)) & 1;
-    this->bit_buffer_length_--;
+    // Shift buffer so valid bits are at MSB positions (bits 31 down to 32-bit_buffer_length_)
+    // The lower bits may contain garbage, so we shift left to align valid bits at top
+    uint32_t shifted_buffer = this->bit_buffer_ << (32 - this->bit_buffer_length_);
 
-    if (bit == 1) {
-      // Found stop bit
-      break;
+    if (shifted_buffer == 0) {
+      // No '1' bits in the valid portion - all zeros
+      // Add all valid bits to unary count and refill
+      unary_count += this->bit_buffer_length_;
+      this->bit_buffer_length_ = 0;
+      continue;
     }
-    unary_count++;
+
+    // Count leading zeros to find the position of the first '1' bit
+    uint32_t leading_zeros = __builtin_clz(shifted_buffer);
+
+    // The leading zeros are all unary 0s, then we have a stop bit (1)
+    unary_count += leading_zeros;
+
+    // Consume the leading zeros plus the stop bit
+    this->bit_buffer_length_ -= (leading_zeros + 1);
+    break;
   }
 
   // Read parameter bits using existing function
