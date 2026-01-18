@@ -932,7 +932,7 @@ void FLACDecoder::align_to_byte() {
   }
 }
 
-inline bool FLACDecoder::refill_bit_buffer() {
+inline __attribute__((always_inline)) bool FLACDecoder::refill_bit_buffer() {
   if (this->bytes_left_ >= 4) {
     uint32_t new_word;
     std::memcpy(&new_word, &this->buffer_[this->buffer_index_], sizeof(uint32_t));
@@ -953,7 +953,7 @@ inline bool FLACDecoder::refill_bit_buffer() {
   return true;
 }
 
-inline uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
+inline __attribute__((always_inline)) uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
   uint32_t result = 0;
 
   const int32_t new_bits_needed = num_bits - this->bit_buffer_length_;
@@ -984,7 +984,7 @@ inline uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
   return result;
 }
 
-inline int32_t FLACDecoder::read_sint(std::size_t num_bits) {
+inline __attribute__((always_inline)) int32_t FLACDecoder::read_sint(std::size_t num_bits) {
   // Handle 33-bit reads for side channel in 32-bit MID_SIDE stereo
   if (num_bits > 32) {
     // For 33-bit values, we need special handling
@@ -1015,7 +1015,7 @@ inline int32_t FLACDecoder::read_sint(std::size_t num_bits) {
   return (int32_t) next_int - (((int32_t) next_int >> (num_bits - 1)) << num_bits);
 }
 
-inline int32_t FLACDecoder::read_rice_sint(uint8_t param) {
+inline __attribute__((always_inline)) int32_t FLACDecoder::read_rice_sint(uint8_t param) {
   uint32_t unary_count = 0;
 
   // Optimized unary bit reading using __builtin_clz (count leading zeros)
