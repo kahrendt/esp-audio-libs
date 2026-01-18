@@ -8,7 +8,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 namespace esp_audio_libs {
 namespace flac {
@@ -34,10 +33,11 @@ bool can_use_32bit_lpc(uint32_t sample_depth, const int32_t *coefs, uint32_t ord
 ///
 /// @param sub_frame_buffer Buffer containing warm-up samples followed by residuals (modified in-place)
 /// @param num_of_samples Total number of samples in the buffer
-/// @param coefs Vector of LPC coefficients
+/// @param coefs Pointer to array of LPC coefficients
+/// @param coefs_size Number of coefficients (predictor order)
 /// @param shift Right shift amount to apply after prediction
 void restore_linear_prediction_32bit(int32_t *sub_frame_buffer, std::size_t num_of_samples,
-                                     const std::vector<int32_t> &coefs, int32_t shift);
+                                     const int32_t *coefs, std::size_t coefs_size, int32_t shift);
 
 /// @brief Restore linear prediction using 64-bit arithmetic
 ///
@@ -46,10 +46,11 @@ void restore_linear_prediction_32bit(int32_t *sub_frame_buffer, std::size_t num_
 ///
 /// @param sub_frame_buffer Buffer containing warm-up samples followed by residuals (modified in-place)
 /// @param num_of_samples Total number of samples in the buffer
-/// @param coefs Vector of LPC coefficients
+/// @param coefs Pointer to array of LPC coefficients
+/// @param coefs_size Number of coefficients (predictor order)
 /// @param shift Right shift amount to apply after prediction
 void restore_linear_prediction_64bit(int32_t *sub_frame_buffer, std::size_t num_of_samples,
-                                     const std::vector<int32_t> &coefs, int32_t shift);
+                                     const int32_t *coefs, std::size_t coefs_size, int32_t shift);
 
 }  // namespace flac
 }  // namespace esp_audio_libs

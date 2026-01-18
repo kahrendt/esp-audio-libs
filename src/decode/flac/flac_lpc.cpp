@@ -1,7 +1,7 @@
 #include "flac_lpc.h"
 #include "flac_lpc_asm.h"
 
-#include <algorithm>
+#include <cstdlib>
 #include <climits>
 #include <cstdint>
 
@@ -83,13 +83,13 @@ bool can_use_32bit_lpc(uint32_t sample_depth, const int32_t *coefs, uint32_t ord
 }
 
 void restore_linear_prediction_32bit(int32_t *sub_frame_buffer, std::size_t num_of_samples,
-                                     const std::vector<int32_t> &coefs, int32_t shift) {
+                                     const int32_t *coefs, std::size_t coefs_size, int32_t shift) {
 #if (flac_lpc_asm_enabled == 1)
   // Use optimized assembly version for Xtensa
-  restore_linear_prediction_32bit_asm(sub_frame_buffer, num_of_samples, coefs.data(), coefs.size(), shift);
+  restore_linear_prediction_32bit_asm(sub_frame_buffer, num_of_samples, coefs, coefs_size, shift);
 #else
   // C++ implementation for other platforms
-  const std::size_t number_of_coefficients = coefs.size();
+  const std::size_t number_of_coefficients = coefs_size;
   const std::size_t outer_loop_bound = num_of_samples - number_of_coefficients;
 
   for (std::size_t i = 0; i < outer_loop_bound; ++i) {
@@ -104,13 +104,13 @@ void restore_linear_prediction_32bit(int32_t *sub_frame_buffer, std::size_t num_
 }
 
 void restore_linear_prediction_64bit(int32_t *sub_frame_buffer, std::size_t num_of_samples,
-                                     const std::vector<int32_t> &coefs, int32_t shift) {
+                                     const int32_t *coefs, std::size_t coefs_size, int32_t shift) {
 #if (flac_lpc_asm_enabled == 1)
   // Use optimized 64-bit assembly version for Xtensa
-  restore_linear_prediction_64bit_asm(sub_frame_buffer, num_of_samples, coefs.data(), coefs.size(), shift);
+  restore_linear_prediction_64bit_asm(sub_frame_buffer, num_of_samples, coefs, coefs_size, shift);
 #else
   // C++ implementation for other platforms
-  const std::size_t number_of_coefficients = coefs.size();
+  const std::size_t number_of_coefficients = coefs_size;
   const std::size_t outer_loop_bound = num_of_samples - number_of_coefficients;
 
   for (std::size_t i = 0; i < outer_loop_bound; ++i) {

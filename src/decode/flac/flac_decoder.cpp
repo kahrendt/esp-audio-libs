@@ -26,7 +26,19 @@ static inline uint32_t uint_mask(uint32_t num_bits) {
   return (num_bits >= 32) ? 0xFFFFFFFF : ((1U << num_bits) - 1);
 }
 
-static const std::vector<int32_t> FIXED_COEFFICIENTS[] = {{}, {1}, {-1, 2}, {1, -3, 3}, {-1, 4, -6, 4}};
+// Fixed prediction coefficients for orders 0-4
+// Order 0: no coefficients
+// Order 1: [1]
+// Order 2: [-1, 2]
+// Order 3: [1, -3, 3]
+// Order 4: [-1, 4, -6, 4]
+static const int32_t FIXED_COEFFICIENTS_1[] = {1};
+static const int32_t FIXED_COEFFICIENTS_2[] = {-1, 2};
+static const int32_t FIXED_COEFFICIENTS_3[] = {1, -3, 3};
+static const int32_t FIXED_COEFFICIENTS_4[] = {-1, 4, -6, 4};
+
+static const int32_t *const FIXED_COEFFICIENTS[] = {nullptr, FIXED_COEFFICIENTS_1, FIXED_COEFFICIENTS_2,
+                                                    FIXED_COEFFICIENTS_3, FIXED_COEFFICIENTS_4};
 
 // ============================================================================
 // Header Parsing
@@ -839,10 +851,10 @@ FLACDecoderResult FLACDecoder::decode_fixed_subframe(uint32_t block_size, std::s
 
   // For fixed prediction, quantization level is always 0
   // Check if we can use 32-bit arithmetic safely
-  if (can_use_32bit_lpc(sample_depth, FIXED_COEFFICIENTS[pre_order].data(), pre_order, 0)) {
-    restore_linear_prediction_32bit(sub_frame_buffer, block_size, FIXED_COEFFICIENTS[pre_order], 0);
+  if (can_use_32bit_lpc(sample_depth, FIXED_COEFFICIENTS[pre_order], pre_order, 0)) {
+    restore_linear_prediction_32bit(sub_frame_buffer, block_size, FIXED_COEFFICIENTS[pre_order], pre_order, 0);
   } else {
-    restore_linear_prediction_64bit(sub_frame_buffer, block_size, FIXED_COEFFICIENTS[pre_order], 0);
+    restore_linear_prediction_64bit(sub_frame_buffer, block_size, FIXED_COEFFICIENTS[pre_order], pre_order, 0);
   }
 
   return result;
@@ -863,8 +875,8 @@ FLACDecoderResult FLACDecoder::decode_lpc_subframe(uint32_t block_size, std::siz
   uint32_t precision = this->read_uint(4) + 1;
   int32_t shift = this->read_sint(5);
 
-  std::vector<int32_t> coefs;
-  coefs.resize(lpc_order);
+  // Max LPC order is 32 per FLAC specification
+  int32_t coefs[32];
   for (std::size_t i = 0; i < lpc_order; i++) {
     coefs[lpc_order - i - 1] = this->read_sint(precision);
   }
@@ -875,10 +887,10 @@ FLACDecoderResult FLACDecoder::decode_lpc_subframe(uint32_t block_size, std::siz
   }
 
   // Check if we can use 32-bit arithmetic safely
-  if (can_use_32bit_lpc(sample_depth, coefs.data(), lpc_order, shift)) {
-    restore_linear_prediction_32bit(sub_frame_buffer, block_size, coefs, shift);
+  if (can_use_32bit_lpc(sample_depth, coefs, lpc_order, shift)) {
+    restore_linear_prediction_32bit(sub_frame_buffer, block_size, coefs, lpc_order, shift);
   } else {
-    restore_linear_prediction_64bit(sub_frame_buffer, block_size, coefs, shift);
+    restore_linear_prediction_64bit(sub_frame_buffer, block_size, coefs, lpc_order, shift);
   }
 
   return result;
