@@ -20,11 +20,11 @@ namespace flac {
 
 static const uint32_t MAGIC_NUMBER = 0x664C6143;  // 'fLaC'
 
-static const uint32_t UINT_MASK[] = {0x00000000, 0x00000001, 0x00000003, 0x00000007, 0x0000000f, 0x0000001f, 0x0000003f,
-                                     0x0000007f, 0x000000ff, 0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff, 0x00001fff,
-                                     0x00003fff, 0x00007fff, 0x0000ffff, 0x0001ffff, 0x0003ffff, 0x0007ffff, 0x000fffff,
-                                     0x001fffff, 0x003fffff, 0x007fffff, 0x00ffffff, 0x01ffffff, 0x03ffffff, 0x07ffffff,
-                                     0x0fffffff, 0x1fffffff, 0x3fffffff, 0x7fffffff, 0xffffffff};
+// Generate a bitmask with num_bits set to 1 (e.g., num_bits=3 -> 0b111 = 7)
+// This replaces the UINT_MASK lookup table with bit manipulation for better performance
+static inline uint32_t uint_mask(uint32_t num_bits) {
+  return (num_bits >= 32) ? 0xFFFFFFFF : ((1U << num_bits) - 1);
+}
 
 static const std::vector<int32_t> FIXED_COEFFICIENTS[] = {{}, {1}, {-1, 2}, {1, -3, 3}, {-1, 4, -6, 4}};
 
@@ -979,7 +979,7 @@ inline uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
 
   result |= (this->bit_buffer_ >> this->bit_buffer_length_);
 
-  result &= UINT_MASK[num_bits];
+  result &= uint_mask(num_bits);
 
   return result;
 }
