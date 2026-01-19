@@ -15,6 +15,15 @@
 #define FLAC_OPTIMIZE_O3
 #endif
 
+// Force inline for performance-critical functions
+#if defined(__GNUC__) || defined(__clang__)
+#define FLAC_ALWAYS_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define FLAC_ALWAYS_INLINE __forceinline
+#else
+#define FLAC_ALWAYS_INLINE inline
+#endif
+
 namespace esp_audio_libs {
 namespace flac {
 
@@ -1011,7 +1020,7 @@ void FLACDecoder::align_to_byte() {
   }
 }
 
-inline __attribute__((always_inline)) bool FLACDecoder::refill_bit_buffer() {
+FLAC_ALWAYS_INLINE bool FLACDecoder::refill_bit_buffer() {
   if (this->bytes_left_ >= 4) {
     uint32_t new_word;
     std::memcpy(&new_word, &this->buffer_[this->buffer_index_], sizeof(uint32_t));
@@ -1032,7 +1041,7 @@ inline __attribute__((always_inline)) bool FLACDecoder::refill_bit_buffer() {
   return true;
 }
 
-inline __attribute__((always_inline)) uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
+FLAC_ALWAYS_INLINE uint32_t FLACDecoder::read_uint(std::size_t num_bits) {
   uint32_t result = 0;
 
   const int32_t new_bits_needed = num_bits - this->bit_buffer_length_;
@@ -1063,7 +1072,7 @@ inline __attribute__((always_inline)) uint32_t FLACDecoder::read_uint(std::size_
   return result;
 }
 
-inline __attribute__((always_inline)) int32_t FLACDecoder::read_sint(std::size_t num_bits) {
+FLAC_ALWAYS_INLINE int32_t FLACDecoder::read_sint(std::size_t num_bits) {
   // Handle 33-bit reads for side channel in 32-bit MID_SIDE stereo
   if (num_bits > 32) {
     // For 33-bit values, we need special handling
@@ -1094,7 +1103,7 @@ inline __attribute__((always_inline)) int32_t FLACDecoder::read_sint(std::size_t
   return (int32_t) next_int - (((int32_t) next_int >> (num_bits - 1)) << num_bits);
 }
 
-inline __attribute__((always_inline)) int32_t FLACDecoder::read_rice_sint(uint8_t param) {
+FLAC_ALWAYS_INLINE int32_t FLACDecoder::read_rice_sint(uint8_t param) {
   uint32_t unary_count = 0;
 
   // Optimized unary bit reading using __builtin_clz (count leading zeros)
