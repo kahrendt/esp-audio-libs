@@ -79,32 +79,13 @@ FLACDecoderResult FLACDecoder::read_header(const uint8_t *buffer, size_t buffer_
     }
 
     // Determine if we should skip this metadata block due to size limits
+    // Use array indexing for faster lookup (types 0-6 map directly, others use index 7)
     bool should_skip = false;
     if (this->partial_header_type_ != FLAC_METADATA_TYPE_STREAMINFO) {
-      uint32_t max_size = 0;
-      switch (this->partial_header_type_) {
-        case FLAC_METADATA_TYPE_PADDING:
-          max_size = this->max_padding_size_;
-          break;
-        case FLAC_METADATA_TYPE_APPLICATION:
-          max_size = this->max_application_size_;
-          break;
-        case FLAC_METADATA_TYPE_SEEKTABLE:
-          max_size = this->max_seektable_size_;
-          break;
-        case FLAC_METADATA_TYPE_VORBIS_COMMENT:
-          max_size = this->max_vorbis_comment_size_;
-          break;
-        case FLAC_METADATA_TYPE_CUESHEET:
-          max_size = this->max_cuesheet_size_;
-          break;
-        case FLAC_METADATA_TYPE_PICTURE:
-          max_size = this->max_album_art_size_;
-          break;
-        default:
-          max_size = this->max_unknown_size_;
-          break;
-      }
+      size_t size_index = (this->partial_header_type_ < METADATA_SIZE_LIMITS_COUNT - 1)
+                              ? this->partial_header_type_
+                              : METADATA_SIZE_LIMITS_COUNT - 1;
+      uint32_t max_size = this->max_metadata_sizes_[size_index];
 
       if (this->partial_header_length_ > max_size) {
         should_skip = true;
@@ -132,13 +113,15 @@ FLACDecoderResult FLACDecoder::read_header(const uint8_t *buffer, size_t buffer_
       this->partial_header_length_ = 0;
       this->partial_header_bytes_read_ = 0;
     } else if (should_skip) {
+      // Reset bit buffer to get accurate bytes_left_ count, then skip in batch
+      this->reset_bit_buffer();
       uint32_t bytes_to_skip = std::min(this->partial_header_length_ - this->partial_header_bytes_read_,
                                         static_cast<uint32_t>(this->bytes_left_));
 
-      for (uint32_t i = 0; i < bytes_to_skip; i++) {
-        this->read_uint(8);
-        this->partial_header_bytes_read_++;
-      }
+      // Skip bytes in batch by advancing buffer position directly
+      this->buffer_index_ += bytes_to_skip;
+      this->bytes_left_ -= bytes_to_skip;
+      this->partial_header_bytes_read_ += bytes_to_skip;
 
       if (this->partial_header_bytes_read_ == this->partial_header_length_) {
         this->partial_header_length_ = 0;
@@ -150,13 +133,19 @@ FLACDecoderResult FLACDecoder::read_header(const uint8_t *buffer, size_t buffer_
         this->partial_header_data_.reserve(this->partial_header_length_);
       }
 
+      // Reset bit buffer to get accurate bytes_left_ count for batch read
+      this->reset_bit_buffer();
       uint32_t bytes_to_read = std::min(this->partial_header_length_ - this->partial_header_bytes_read_,
                                         static_cast<uint32_t>(this->bytes_left_));
 
-      for (uint32_t i = 0; i < bytes_to_read; i++) {
-        this->partial_header_data_.push_back(this->read_uint(8));
-        this->partial_header_bytes_read_++;
-      }
+      // Use batch memcpy instead of byte-by-byte read_uint(8) calls
+      size_t current_size = this->partial_header_data_.size();
+      this->partial_header_data_.resize(current_size + bytes_to_read);
+      std::memcpy(this->partial_header_data_.data() + current_size,
+                  this->buffer_ + this->buffer_index_, bytes_to_read);
+      this->buffer_index_ += bytes_to_read;
+      this->bytes_left_ -= bytes_to_read;
+      this->partial_header_bytes_read_ += bytes_to_read;
 
       if (this->partial_header_bytes_read_ == this->partial_header_length_) {
         FLACMetadataBlock block;
@@ -291,22 +280,55 @@ FLACDecoderResult FLACDecoder::decode_frame(const uint8_t *buffer, size_t buffer
 
 FLAC_OPTIMIZE_O3
 void FLACDecoder::write_samples_16bit_stereo(uint8_t *output_buffer, uint32_t block_size) {
-  // 16-bit stereo fast path
+  // 16-bit stereo fast path with pointer arithmetic and 4-sample unrolling
   int16_t *output_samples = reinterpret_cast<int16_t *>(output_buffer);
+  const int32_t *left = this->block_samples_;
+  const int32_t *right = this->block_samples_ + block_size;
 
-  for (uint32_t i = 0; i < block_size; ++i) {
-    output_samples[2 * i] = this->block_samples_[i];
-    output_samples[2 * i + 1] = this->block_samples_[block_size + i];
+  uint32_t i = 0;
+  const uint32_t unroll_limit = block_size & ~3U;  // Round down to multiple of 4
+
+  // Process 4 samples at a time
+  for (; i < unroll_limit; i += 4) {
+    output_samples[0] = left[i];
+    output_samples[1] = right[i];
+    output_samples[2] = left[i + 1];
+    output_samples[3] = right[i + 1];
+    output_samples[4] = left[i + 2];
+    output_samples[5] = right[i + 2];
+    output_samples[6] = left[i + 3];
+    output_samples[7] = right[i + 3];
+    output_samples += 8;
+  }
+
+  // Handle remaining samples
+  for (; i < block_size; ++i) {
+    output_samples[0] = left[i];
+    output_samples[1] = right[i];
+    output_samples += 2;
   }
 }
 
 FLAC_OPTIMIZE_O3
 void FLACDecoder::write_samples_16bit_mono(uint8_t *output_buffer, uint32_t block_size) {
-  // 16-bit mono fast path
+  // 16-bit mono fast path with pointer arithmetic and loop unrolling
   int16_t *output_samples = reinterpret_cast<int16_t *>(output_buffer);
+  const int32_t *samples = this->block_samples_;
 
-  for (uint32_t i = 0; i < block_size; ++i) {
-    output_samples[i] = this->block_samples_[i];
+  uint32_t i = 0;
+  const uint32_t unroll_limit = block_size & ~3U;  // Round down to multiple of 4
+
+  // Process 4 samples at a time
+  for (; i < unroll_limit; i += 4) {
+    output_samples[i] = samples[i];
+    output_samples[i + 1] = samples[i + 1];
+    output_samples[i + 2] = samples[i + 2];
+    output_samples[i + 3] = samples[i + 3];
+  }
+
+  // Handle remaining samples
+  for (; i < block_size; ++i) {
+    output_samples[i] = samples[i];
   }
 }
 
@@ -1136,48 +1158,19 @@ void FLACDecoder::free_buffers() {
 // ============================================================================
 
 void FLACDecoder::set_max_metadata_size(FLACMetadataType type, uint32_t max_size) {
-  switch (type) {
-    case FLAC_METADATA_TYPE_PADDING:
-      this->max_padding_size_ = max_size;
-      break;
-    case FLAC_METADATA_TYPE_APPLICATION:
-      this->max_application_size_ = max_size;
-      break;
-    case FLAC_METADATA_TYPE_SEEKTABLE:
-      this->max_seektable_size_ = max_size;
-      break;
-    case FLAC_METADATA_TYPE_VORBIS_COMMENT:
-      this->max_vorbis_comment_size_ = max_size;
-      break;
-    case FLAC_METADATA_TYPE_CUESHEET:
-      this->max_cuesheet_size_ = max_size;
-      break;
-    case FLAC_METADATA_TYPE_PICTURE:
-      this->max_album_art_size_ = max_size;
-      break;
-    default:
-      this->max_unknown_size_ = max_size;
-      break;
-  }
+  // Use array indexing for faster access (types 0-6 map directly, others use index 7)
+  size_t index = (static_cast<size_t>(type) < METADATA_SIZE_LIMITS_COUNT - 1)
+                     ? static_cast<size_t>(type)
+                     : METADATA_SIZE_LIMITS_COUNT - 1;
+  this->max_metadata_sizes_[index] = max_size;
 }
 
 uint32_t FLACDecoder::get_max_metadata_size(FLACMetadataType type) const {
-  switch (type) {
-    case FLAC_METADATA_TYPE_PADDING:
-      return this->max_padding_size_;
-    case FLAC_METADATA_TYPE_APPLICATION:
-      return this->max_application_size_;
-    case FLAC_METADATA_TYPE_SEEKTABLE:
-      return this->max_seektable_size_;
-    case FLAC_METADATA_TYPE_VORBIS_COMMENT:
-      return this->max_vorbis_comment_size_;
-    case FLAC_METADATA_TYPE_CUESHEET:
-      return this->max_cuesheet_size_;
-    case FLAC_METADATA_TYPE_PICTURE:
-      return this->max_album_art_size_;
-    default:
-      return this->max_unknown_size_;
-  }
+  // Use array indexing for faster access (types 0-6 map directly, others use index 7)
+  size_t index = (static_cast<size_t>(type) < METADATA_SIZE_LIMITS_COUNT - 1)
+                     ? static_cast<size_t>(type)
+                     : METADATA_SIZE_LIMITS_COUNT - 1;
+  return this->max_metadata_sizes_[index];
 }
 
 }  // namespace flac

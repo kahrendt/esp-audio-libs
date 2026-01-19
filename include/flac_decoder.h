@@ -305,10 +305,10 @@ class FLACDecoder {
   /// Set to 0 to disable album art storage (default on memory-constrained devices).
   ///
   /// @param max_size Maximum size in bytes (0 = disabled)
-  void set_max_album_art_size(uint32_t max_size) { this->max_album_art_size_ = max_size; }
+  void set_max_album_art_size(uint32_t max_size) { this->max_metadata_sizes_[FLAC_METADATA_TYPE_PICTURE] = max_size; }
 
   /// Get current album art size limit
-  uint32_t get_max_album_art_size() const { return this->max_album_art_size_; }
+  uint32_t get_max_album_art_size() const { return this->max_metadata_sizes_[FLAC_METADATA_TYPE_PICTURE]; }
 
   /// @brief Set maximum metadata block size for a specific type
   ///
@@ -492,14 +492,22 @@ class FLACDecoder {
   // ========================================
   // Metadata Storage
   // ========================================
-  std::vector<FLACMetadataBlock> metadata_blocks_;            // All decoded metadata blocks
-  uint32_t max_album_art_size_ = DEFAULT_MAX_ALBUM_ART_SIZE;  // Max album art size to store
-  uint32_t max_padding_size_ = DEFAULT_MAX_PADDING_SIZE;
-  uint32_t max_application_size_ = DEFAULT_MAX_APPLICATION_SIZE;
-  uint32_t max_seektable_size_ = DEFAULT_MAX_SEEKTABLE_SIZE;
-  uint32_t max_vorbis_comment_size_ = DEFAULT_MAX_VORBIS_COMMENT_SIZE;
-  uint32_t max_cuesheet_size_ = DEFAULT_MAX_CUESHEET_SIZE;
-  uint32_t max_unknown_size_ = DEFAULT_MAX_UNKNOWN_SIZE;
+  std::vector<FLACMetadataBlock> metadata_blocks_;  // All decoded metadata blocks
+
+  // Maximum size limits for each metadata type, indexed by FLACMetadataType enum value (0-6)
+  // Index 7 is used for unknown/other types (types > 6)
+  // Using array indexing instead of switch statement for faster lookup
+  static constexpr size_t METADATA_SIZE_LIMITS_COUNT = 8;  // Types 0-6 plus unknown (index 7)
+  uint32_t max_metadata_sizes_[METADATA_SIZE_LIMITS_COUNT] = {
+      0,                                 // STREAMINFO (0) - always stored, limit not used
+      DEFAULT_MAX_PADDING_SIZE,          // PADDING (1)
+      DEFAULT_MAX_APPLICATION_SIZE,      // APPLICATION (2)
+      DEFAULT_MAX_SEEKTABLE_SIZE,        // SEEKTABLE (3)
+      DEFAULT_MAX_VORBIS_COMMENT_SIZE,   // VORBIS_COMMENT (4)
+      DEFAULT_MAX_CUESHEET_SIZE,         // CUESHEET (5)
+      DEFAULT_MAX_ALBUM_ART_SIZE,        // PICTURE (6)
+      DEFAULT_MAX_UNKNOWN_SIZE           // Unknown types (index 7)
+  };
 };
 
 }  // namespace flac
