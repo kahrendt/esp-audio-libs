@@ -52,11 +52,33 @@ uint8_t calculate_crc8(const uint8_t *data, std::size_t len) {
   return crc;
 }
 
+// Force O3 optimization for CRC-16 calculation (performance critical)
+#if defined(__GNUC__) && !defined(__clang__)
+__attribute__((optimize("O3")))
+#endif
 uint16_t calculate_crc16(const uint8_t *data, std::size_t len) {
   uint16_t crc = 0;
-  for (std::size_t i = 0; i < len; i++) {
-    crc = ((crc << 8) ^ CRC16_TABLE[((crc >> 8) ^ data[i]) & 0xFF]) & 0xFFFF;
+  const uint8_t *end = data + len;
+  const uint8_t *end8 = data + (len & ~7U);  // Round down to multiple of 8
+
+  // Process 8 bytes at a time for better loop efficiency
+  while (data < end8) {
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[0]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[1]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[2]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[3]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[4]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[5]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[6]];
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ data[7]];
+    data += 8;
   }
+
+  // Handle remaining bytes (0-7)
+  while (data < end) {
+    crc = (crc << 8) ^ CRC16_TABLE[(crc >> 8) ^ *data++];
+  }
+
   return crc;
 }
 
