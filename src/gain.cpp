@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <atomic>
 #include <cstdint>
 
 #include "compiler.h"
@@ -305,40 +306,89 @@ inline size_t sub_block_for_segment(uint32_t samples, uint32_t span_q31) {
 
 }  // namespace
 
-void GainRamp::set_target(int32_t target_q31, uint32_t ramp_samples) {
-  if (target_q31 == this->target_q31_ && this->samples_remaining_ == 0) {
-    return;  // Already settled there.
-  }
+void GainRamp::schedule_(int32_t target_q31, uint32_t samples_per_step, uint32_t steps) {
   this->target_q31_ = target_q31;
-
-  this->samples_per_step_ = 0;
-  if (ramp_samples > 0 && target_q31 != this->current_q31_) {
-    const uint32_t steps = ramp_segments(this->current_q31_, target_q31);
-    this->samples_per_step_ = ramp_samples / steps;
-    // Exact multiple of samples_per_step so the final segment ends as samples_remaining hits 0.
-    // Also what makes process() start a fresh segment on its next call after a retarget.
-    this->samples_remaining_ = this->samples_per_step_ * steps;
-  }
-  if (this->samples_per_step_ == 0) {
+  this->samples_per_step_ = samples_per_step;
+  if (samples_per_step == 0) {
     // Nothing to ramp, or too short to give each step a sample: jump.
     this->current_q31_ = target_q31;
     this->samples_remaining_ = 0;
+    return;
   }
+  // Exact multiple of samples_per_step so the final segment ends as samples_remaining hits 0.
+  // Also what makes process() start a fresh segment on its next call after a retarget. A rate large
+  // enough to overflow is clamped by shrinking the step so the product still fits and stays exact.
+  if (samples_per_step > UINT32_MAX / steps) {
+    this->samples_per_step_ = UINT32_MAX / steps;
+  }
+  this->samples_remaining_ = this->samples_per_step_ * steps;
 }
 
-void GainRamp::set_target_db_reduction(uint8_t db, uint32_t ramp_samples) {
-  if (db != this->last_db_) {
-    this->last_db_ = db;
-    this->last_db_q31_ = db_reduction_to_q31(db);
+void GainRamp::post_request_(int32_t target_q31, uint32_t param, bool at_rate) {
+  // Seqlock writer: odd sequence while the fields are in flux, even once they are consistent.
+  const uint32_t seq = this->request_seq_.load(std::memory_order_relaxed);
+  this->request_seq_.store(seq + 1, std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_release);
+  this->request_target_.store(target_q31, std::memory_order_relaxed);
+  this->request_param_.store(param, std::memory_order_relaxed);
+  this->request_at_rate_.store(at_rate, std::memory_order_relaxed);
+  this->request_seq_.store(seq + 2, std::memory_order_release);
+}
+
+void GainRamp::take_request_() {
+  // Seqlock reader. Never waits: a request caught mid-write is simply tried again next block, so
+  // process() cannot stall on a lower-priority writer it has preempted.
+  const uint32_t seq = this->request_seq_.load(std::memory_order_acquire);
+  if (seq == this->applied_seq_ || (seq & 1) != 0) {
+    return;
   }
-  this->set_target(this->last_db_q31_, ramp_samples);
+  const int32_t target_q31 = this->request_target_.load(std::memory_order_relaxed);
+  const uint32_t param = this->request_param_.load(std::memory_order_relaxed);
+  const bool at_rate = this->request_at_rate_.load(std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_acquire);
+  if (this->request_seq_.load(std::memory_order_relaxed) != seq) {
+    return;
+  }
+  this->applied_seq_ = seq;
+
+  if (target_q31 == this->target_q31_ && this->samples_remaining_ == 0) {
+    return;  // Already settled there.
+  }
+  if (param == 0 || target_q31 == this->current_q31_) {
+    this->schedule_(target_q31, 0, 0);
+    return;
+  }
+  const uint32_t steps = ramp_segments(this->current_q31_, target_q31);
+  this->schedule_(target_q31, at_rate ? param : param / steps, steps);
+}
+
+void GainRamp::set_target_over(int32_t target_q31, uint32_t ramp_samples) {
+  this->post_request_(target_q31, ramp_samples, false);
+}
+
+void GainRamp::set_target_db_reduction_over(uint8_t db, uint32_t ramp_samples) {
+  this->set_target_over(db_reduction_to_q31(db), ramp_samples);
+}
+
+void GainRamp::set_target_db_over(float db, uint32_t ramp_samples) {
+  this->set_target_over(db_to_q31(db), ramp_samples);
+}
+
+void GainRamp::set_target_at_rate(int32_t target_q31, uint32_t samples_per_db) {
+  this->post_request_(target_q31, samples_per_db, true);
+}
+
+void GainRamp::set_target_db_reduction_at_rate(uint8_t db, uint32_t samples_per_db) {
+  this->set_target_at_rate(db_reduction_to_q31(db), samples_per_db);
+}
+
+void GainRamp::set_target_db_at_rate(float db, uint32_t samples_per_db) {
+  this->set_target_at_rate(db_to_q31(db), samples_per_db);
 }
 
 void GainRamp::process(uint8_t *buffer, uint8_t bytes_per_sample, uint32_t samples) {
-  if (samples == 0) {
-    return;
-  }
-  // set_target() guarantees samples_per_step_ > 0 whenever samples_remaining_ > 0.
+  this->take_request_();
+  // schedule_() guarantees samples_per_step_ > 0 whenever samples_remaining_ > 0.
   while (samples > 0 && this->samples_remaining_ > 0) {
     uint32_t samples_left_in_step = this->samples_remaining_ % this->samples_per_step_;
     if (samples_left_in_step == 0) {
@@ -385,6 +435,7 @@ void GainRamp::process(uint8_t *buffer, uint8_t bytes_per_sample, uint32_t sampl
   if (samples > 0 && this->current_q31_ != INT32_MAX) {
     apply(buffer, buffer, this->current_q31_, samples, bytes_per_sample);
   }
+  this->current_published_.store(this->current_q31_, std::memory_order_relaxed);
 }
 
 }  // namespace gain
