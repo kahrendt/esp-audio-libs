@@ -41,7 +41,7 @@ int32_t db_reduction_to_q31(uint8_t db) {
 void apply(const uint8_t *audio_samples, uint8_t *output_buffer, int32_t q31_scale, size_t samples_to_scale,
            size_t bytes_per_sample) {
   // Silence at every bit depth (8 bit is int8), and the steady state while fully ducked.
-  if (q31_scale == 0) {
+  if (q31_scale == 0 && bytes_per_sample >= 1 && bytes_per_sample <= 4) {
     std::memset(output_buffer, 0, samples_to_scale * bytes_per_sample);
     return;
   }
