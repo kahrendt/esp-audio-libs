@@ -40,8 +40,7 @@ int32_t db_reduction_to_q31(uint8_t db) {
 
 void apply(const uint8_t *audio_samples, uint8_t *output_buffer, int32_t q31_scale, size_t samples_to_scale,
            size_t bytes_per_sample) {
-  // A zero factor produces silence for every bit depth (8 bit is int8, so 0x00 is silence), so a
-  // settled fade-out only needs a memset. This is the common case while fully ducked.
+  // Silence at every bit depth (8 bit is int8), and the steady state while fully ducked.
   if (q31_scale == 0) {
     std::memset(output_buffer, 0, samples_to_scale * bytes_per_sample);
     return;
